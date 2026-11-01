@@ -76,7 +76,8 @@ graphics.library's drawing calls are where the marks come from. The thunks go on
 How a thunk works:
 
 - It is 50 bytes of code in memory. It saves the argument registers, calls the call it stands on with every register as its caller set it, then hands the saved registers to `oc_mark`.
-- `oc_mark` returns at once unless the RastPort's layer is a composited one of ours (a magic word and a surface). Otherwise it turns the arguments into a box: the rectangle of RectFill, ScrollRaster and the blits, the font's rows for Text, the whole layer for the rest.
+- `oc_mark` returns at once unless the RastPort's layer is a composited one of ours (a magic word and a surface). Otherwise it turns the arguments into a box (`layers_mark.h`): the rectangle of RectFill, ScrollRaster, the blits, WritePixelLine8's row and ScalePixelArray's destination; the font's rows for Text; the box round the pen's place and the points for Draw and PolyDraw; the box round DrawEllipse's ellipse; the text's rows from the pen to the right for ClearEOL, and down to the bottom for ClearScreen; the whole layer for the rest (SetRast, Flood, AreaEnd, DrawGList, DoCDrawMethodTagList and OpenRTG's WritePixels, WritePixelsAlpha and PresentVirgl).
+- Draw and PolyDraw move the pen, so the thunk's call to `oc_pre` before the call keeps the pen's place in a scratch register the call does not take (Draw a0, PolyDraw d1), in the thunk's copy of the registers, for `oc_mark` to read after it.
 - WORD arguments are read as words, as graphics.library reads them.
 
 Thunks are never taken out, since others may have called on to them. A patch put on top of ours later, such as OpenGfx's when OpenRTG hands its drawing over after boot, may draw without calling ours. So every compose and every composited stack change checks the vectors, and puts a new thunk on top where ours is no longer there.

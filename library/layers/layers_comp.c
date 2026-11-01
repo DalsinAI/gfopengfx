@@ -134,25 +134,9 @@ struct oc_batch {
 
 /* ---- marking what is drawn --------------------------------------------- */
 
-/* What a drawing call draws, from its registers as the thunk saved them:
- * 0-7 d0-d7, 8 a0, 9 a1. */
-enum { MK_WHOLE, MK_XYXY, MK_XYWH, MK_TEXT };
-struct omark {
-    UBYTE type, rp, a, b, c, d;
-};
-static const struct omark marks[] = {
-    { MK_WHOLE, 9, 0, 0, 0, 0 },        /* 0: the RastPort in a1, all of its layer */
-    { MK_XYXY, 9, 0, 1, 2, 3 },         /* 1: RectFill, BltPattern, EraseRect */
-    { MK_XYXY, 9, 2, 3, 4, 5 },         /* 2: ScrollRaster, ScrollRasterBF */
-    { MK_XYWH, 9, 2, 3, 4, 5 },         /* 3: BltTemplate, ClipBlit, BltBitMapRastPort, BltMaskBitMapRastPort, MovePixelArray */
-    { MK_XYXY, 9, 0, 1, 0, 1 },         /* 4: WritePixel, WriteRGBPixel */
-    { MK_XYXY, 8, 0, 1, 2, 3 },         /* 5: WritePixelArray8, WriteChunkyPixels */
-    { MK_WHOLE, 8, 0, 0, 0, 0 },        /* 6: WritePixelLine8 */
-    { MK_TEXT, 9, 0, 0, 0, 0 },         /* 7: Text: the rows of the font, all across */
-    { MK_WHOLE, 9, 0, 0, 0, 0 },        /* 8: DrawEllipse */
-    { MK_XYWH, 9, 3, 4, 5, 6 },         /* 9: WritePixelArray, WriteLUTPixelArray, WritePixelArrayAlpha */
-    { MK_XYWH, 9, 0, 1, 2, 3 },         /* 10: InvertPixelArray, FillPixelArray, ORTG_FillPixels, ORTG_InvertPixels */
-};
+/* What a drawing call draws, from its registers: layers_mark.h's marks[]
+ * (pure, tested under qemu-m68k by tests/m68k/test_comp_marks.sh). */
+#include "layers_mark.h"
 
 /* The calls marked: graphics.library's drawing calls (0), CyberGraphX's
  * (1) and OpenRTG's (2) that draw into a RastPort. */
@@ -162,19 +146,19 @@ struct opatch {
 };
 static const struct opatch patches[OC_NPATCH] = {
     { 0, 3, -36 },      /* BltTemplate */
-    { 0, 0, -42 },      /* ClearEOL */
-    { 0, 0, -48 },      /* ClearScreen */
+    { 0, 13, -42 },     /* ClearEOL */
+    { 0, 14, -48 },     /* ClearScreen */
     { 0, 7, -60 },      /* Text */
     { 0, 0, -114 },     /* DrawGList */
     { 0, 8, -180 },     /* DrawEllipse */
     { 0, 0, -234 },     /* SetRast */
-    { 0, 0, -246 },     /* Draw */
+    { 0, 11, -246 },    /* Draw */
     { 0, 0, -264 },     /* AreaEnd */
     { 0, 1, -306 },     /* RectFill */
     { 0, 1, -312 },     /* BltPattern */
     { 0, 4, -324 },     /* WritePixel */
     { 0, 0, -330 },     /* Flood */
-    { 0, 0, -336 },     /* PolyDraw */
+    { 0, 12, -336 },    /* PolyDraw */
     { 0, 2, -396 },     /* ScrollRaster */
     { 0, 3, -552 },     /* ClipBlit */
     { 0, 3, -606 },     /* BltBitMapRastPort */
@@ -184,7 +168,7 @@ static const struct opatch patches[OC_NPATCH] = {
     { 0, 1, -810 },     /* EraseRect */
     { 0, 2, -1002 },    /* ScrollRasterBF */
     { 0, 5, -1056 },    /* WriteChunkyPixels */
-    { 1, 0, -90 },      /* ScalePixelArray */
+    { 1, 9, -90 },      /* ScalePixelArray (DestX d3, DestY d4, DestW d5, DestH d6) */
     { 1, 4, -114 },     /* WriteRGBPixel */
     { 1, 9, -126 },     /* WritePixelArray */
     { 1, 3, -132 },     /* MovePixelArray */
@@ -239,47 +223,22 @@ static void oc_touch(struct ol_base *olb, struct Layer *l, const struct lc_rect 
 }
 
 /* What a drawing call draws, if into a composited layer: the layer, and a
- * rectangle from its top left. regs: d0-d7, a0, a1 as the caller set them. */
+ * rectangle from its top left. regs: d0-d7, a0, a1 as the caller set them
+ * (and ocm_pre kept the pen's place in). */
 static int oc_what(ULONG kind, const ULONG *regs, struct Layer **lp, struct lc_rect *out)
 {
     const struct omark *k = &marks[kind];
     struct RastPort *rp = (struct RastPort *)regs[k->rp];
     struct Layer *l;
     struct OLayer *o;
-    LONG x0, y0, x1, y1, w, h, t;
 
     if (!rp || !(l = rp->Layer)) return 0;
     o = OL(l);
     if (o->magic != OL_MAGIC || !o->surf) return 0;
-    w = l->bounds.MaxX - l->bounds.MinX + 1;
-    h = l->bounds.MaxY - l->bounds.MinY + 1;
-    x0 = y0 = 0;
-    x1 = w - 1;
-    y1 = h - 1;
-    if (k->type == MK_TEXT) {
-        if (rp->Font) {
-            y0 = rp->cp_y - rp->Font->tf_Baseline - l->Scroll_Y;
-            y1 = y0 + rp->Font->tf_YSize - 1;
-        }
-    } else if (k->type != MK_WHOLE) {
-        /* WORD arguments: only the low words are the caller's */
-        LONG a = (WORD)regs[k->a], b = (WORD)regs[k->b], c = (WORD)regs[k->c], d = (WORD)regs[k->d];
-        x0 = a;
-        y0 = b;
-        x1 = k->type == MK_XYXY ? c : a + c - 1;
-        y1 = k->type == MK_XYXY ? d : b + d - 1;
-        if (x0 > x1) { t = x0; x0 = x1; x1 = t; }
-        if (y0 > y1) { t = y0; y0 = y1; y1 = t; }
-        x0 -= l->Scroll_X; x1 -= l->Scroll_X;
-        y0 -= l->Scroll_Y; y1 -= l->Scroll_Y;
-    }
-    if (x0 < 0) x0 = 0;
-    if (y0 < 0) y0 = 0;
-    if (x1 >= w) x1 = w - 1;
-    if (y1 >= h) y1 = h - 1;
-    if (x0 > x1 || y0 > y1) return 0;
+    if (!ocm_bounds(k, regs, rp, l->bounds.MaxX - l->bounds.MinX + 1, l->bounds.MaxY - l->bounds.MinY + 1,
+                    l->Scroll_X, l->Scroll_Y, out))
+        return 0;
     *lp = l;
-    out->x0 = x0; out->y0 = y0; out->x1 = x1; out->y1 = y1;
     return 1;
 }
 
@@ -292,8 +251,9 @@ static void oc_mark(struct OCB *cb, ULONG kind, const ULONG *regs)
     if (oc_what(kind, regs, &l, &r)) oc_add(cb, OL(l), r.x0, r.y0, r.x1, r.y1);
 }
 
-/* 47.106: called by a thunk before the call (below) */
-static void oc_pre(struct OCB *cb, ULONG kind, const ULONG *regs);
+/* Called by a thunk before the call (below): the pen's place kept for a
+ * line (ocm_pre), and 47.106's pull */
+static void oc_pre(struct OCB *cb, ULONG kind, ULONG *regs);
 
 /* A thunk, in memory, for each call: oc_pre(cb, kind, regs) (47.106), then
  * the call's own code, with every register as its caller set it, then
@@ -742,13 +702,14 @@ static void oc_pull(struct OCB *cb, struct OComp *c)
  * hold it, so a drawing task holding its layer's can wait. A task in
  * Forbid or Disable only tries, and draws first when the lock is taken.
  * No screen watched: a byte read; nothing written: a long read too. */
-static void oc_pre(struct OCB *cb, ULONG kind, const ULONG *regs)
+static void oc_pre(struct OCB *cb, ULONG kind, ULONG *regs)
 {
     struct OComp *c;
     struct Layer *l;
     struct Task *me;
     struct lc_rect r;
     int go;
+    ocm_pre(&marks[kind], regs);        /* before anything: Draw and PolyDraw move the pen */
     if (!cb->watching || !oc_what(kind, regs, &l, &r)) return;
     me = FindTask(0);
     if (cb->lock.ss_Owner == me) return;                /* the stack change drawing has pulled (begin) */
