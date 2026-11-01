@@ -69,7 +69,7 @@ The horizontal position follows the HRM:
 | A View with no ViewPorts | MrgCop gives lists that only end the frame | ABI test (VIEW empty) |
 | MrgCop out of memory | MCOP_NO_MEM, with the View's old lists kept | documented |
 | Six planes without EXTRA_HALFBRITE, HAM or dual playfield | On AGA, BPLCON2's KILLEHB, so 64 colours; OCS and ECS have no such bit and show them half-bright | HRM (KILLEHB is AGA's); ABI test |
-| ChangeVPBitMap's messages | dbi_SafeMessage at the next vertical blank (the old bitmap is no longer shown), dbi_DispMessage at the blank after it (a field of the new one has been shown) | autodoc; ABI test for the blanks |
+| ChangeVPBitMap's messages | dbi_SafeMessage and then dbi_DispMessage, both at the next vertical blank: from that field the copper shows the new bitmap and no longer reads the old one. (Until 1 November 2026 DispMessage came a field later, so double buffering the RKM's way, waiting for DispMessage before the next ChangeScreenBuffer, ran at half the field rate) | autodoc; AROS replies both at that blank; test |
 | CoerceMode with AVOID_FLICKER | The non-interlaced modes are tried first, then the interlaced | autodoc (the flag); ABI test for the order |
 | GfxFree of a node that is not one of GfxNew's (the type, subsystem or library not GfxNew's) | Left alone | ABI test |
 | ScrollVPort on a ViewPort that is not shown | MakeVPort makes it again when it is merged | ABI test |
