@@ -1,5 +1,5 @@
 /* LayersABITest: OS 3.2's layers.library and GFOpenLayers side by side.
- * Copyright (c) 2026 AmigaChrome Team. MIT.
+ * Copyright (c) 2026 AmiCradle Team. MIT.
  *
  * Runs one script of calls through a layers.library base and writes what
  * comes of each as lines of text. With gfopenlayers.library in the directory

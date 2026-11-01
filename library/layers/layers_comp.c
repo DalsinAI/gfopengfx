@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT */
-/* OpenLayers' composited mode. Copyright (c) 2026 AmigaChrome Team. MIT.
+/* OpenLayers' composited mode. Copyright (c) 2026 AmiCradle Team. MIT.
  *
  * Included by layers_lib.c when OL_COMPOSITE is defined (the Amiga build;
  * the host and qemu tests build classic layers only). The design is

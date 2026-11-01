@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 /* LayersABITest on the host: what it calls, played by abihost.c over
- * OpenLayers' own code. Copyright (c) 2026 AmigaChrome Team. MIT. */
+ * OpenLayers' own code. Copyright (c) 2026 AmiCradle Team. MIT. */
 #ifndef ABIHOST_SHIM_H
 #define ABIHOST_SHIM_H
 #include <exec/types.h>

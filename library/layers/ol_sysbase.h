@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT */
-/* OpenLayers: exec's base without a global. Copyright (c) 2026 AmigaChrome
+/* OpenLayers: exec's base without a global. Copyright (c) 2026 AmiCradle
  * Team. MIT.
  *
  * Included after <proto/exec.h>, so the exec calls' inline macros read

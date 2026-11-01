@@ -2,7 +2,7 @@
 /* The regions as they were at 6c8b6d90 (library/core/gfx_region.c), kept
  * for tests/m68k/test_gfx_region_ref.sh: every call swept the whole region
  * and built it anew. Built with its calls renamed ref_rgn_... */
-/* OpenGfx's regions (gfx_region.h). Copyright (c) 2026 AmigaChrome Team. MIT.
+/* OpenGfx's regions (gfx_region.h). Copyright (c) 2026 AmiCradle Team. MIT.
  *
  * Every call is one sweep: the edges of both operands cut the plane into
  * bands; in each band the two operands are runs of x, combined by the

@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 /* GFOpenGfx graphics.library: the display's LVOs in their registers, its
- * init and exit, and the vertical blank server. Copyright (c) 2026 AmigaChrome
+ * init and exit, and the vertical blank server. Copyright (c) 2026 AmiCradle
  * Team. MIT.
  *
  * Each gfx_lvo_<Call> takes the fd's arguments in the registers

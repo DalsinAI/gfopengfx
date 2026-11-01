@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 /* LayersABITest on the host, over GFOpenLayers' own code: exec, dos and
  * graphics.library played closely enough that its PROBE lines can be set
- * beside the ones OS 3.2 gave on an Amiga. Copyright (c) 2026 AmigaChrome
+ * beside the ones OS 3.2 gave on an Amiga. Copyright (c) 2026 AmiCradle
  * Team. MIT.
  *
  * Bitmaps are planar, laid out as AllocBitMap lays them out (rows of whole

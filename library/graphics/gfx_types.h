@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 /* GFOpenGfx graphics.library: the shared structure layouts, with no Amiga
- * headers. Copyright (c) 2026 AmigaChrome Team. MIT.
+ * headers. Copyright (c) 2026 AmiCradle Team. MIT.
  *
  * Clean-room: the field order and sizes of the NDK 3.2 headers'
  * published structures (exec/nodes.h, exec/lists.h, exec/libraries.h,
