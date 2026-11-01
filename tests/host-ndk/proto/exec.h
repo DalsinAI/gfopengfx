@@ -1,4 +1,4 @@
-/* host NDK (tests only): the exec calls OpenLayers makes; the test supplies them. */
+/* host NDK (tests only): the exec calls GFOpenLayers makes; the test supplies them. */
 #ifndef PROTO_EXEC_H
 #define PROTO_EXEC_H
 #include <exec/semaphores.h>

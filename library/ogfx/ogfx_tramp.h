@@ -1,14 +1,14 @@
 /* Copyright (c) 2026 AmigaChrome Team. OpenRTG, MIT licence (LICENSE).
  * SPDX-License-Identifier: MIT
  *
- * A patch's entry, 18 bytes of 68k code in opengpu.library's base:
+ * A patch's entry, 18 bytes of 68k code in gfopengpu.library's base:
  *     MOVE.L  A4,-(SP)
  *     MOVEA.L #state,A4
  *     JSR     entry
  *     MOVEA.L (SP)+,A4
  *     RTS
  * graphics.library calls a patch with its own base in A6, so this puts
- * OpenGfx's state in A4 for the C. A4 is the caller's to keep, so it goes
+ * GFOpenGfx's state in A4 for the C. A4 is the caller's to keep, so it goes
  * back; every argument register and D0's result pass through untouched.
  * The caller clears the caches before the entry runs. tests/ogfx/run.sh
  * disassembles what this writes. */

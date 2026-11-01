@@ -1,6 +1,6 @@
-# OpenGfx text
+# GFOpenGfx text
 
-graphics.library's fonts and text for OpenGfx's graphics.library 47.100: clean-room, MIT, API- and ABI-compatible with OS 3.2's. These are the 18 LVOs `library/graphics/OWNERS.md` gives gfx-text:
+graphics.library's fonts and text for GFOpenGfx's graphics.library 47.100: clean-room, MIT, API- and ABI-compatible with OS 3.2's. These are the 18 LVOs `library/graphics/OWNERS.md` gives gfx-text:
 
 - ClearEOL, ClearScreen
 - TextLength, Text, TextExtent, TextFit
@@ -18,7 +18,7 @@ The area also has the ROM fonts topaz 8 and topaz 9, under the names programs op
 | `romfont8.txt`, `romfont9.txt`, `mkfont.py`, `topaz_data.cpp`, `topaz_data.h`, `DEJAVU-LICENCE.txt` | The ROM fonts. `romfont8.txt` (8 x 8, baseline row 6) and `romfont9.txt` (10 x 9, baseline row 7) are DejaVu Sans Mono's letters, as rows of `#` and `.`: the 8 x 8 drawn one bit deep at 10 pixels with the font's own hinting, the 10 x 9 grown from the finished 8 x 8 a row taller and a column or two wider (each time repeating a row or column whose copy thickens no stroke), and both finished by hand, glyph by glyph. Nothing in them comes from Commodore's or AROS's topaz. The design: one-pixel strokes only (the two-pixel stems of the earlier drawing were for tall hires pixels on a CRT), capitals and ascenders to the top row, small letters from row 2, a tail (g j p q y) in the descender row with its bowl a row shorter so the small letters keep one top line, a dotted zero. DejaVu's licence (the Bitstream Vera licence; DejaVu's own changes are public domain) is in `DEJAVU-LICENCE.txt` and goes wherever the font goes; the fonts may not be called Bitstream or Vera. `mkfont.py` composes the accented Latin-1 letters from each file's own marks (`accent.NAME`) over its short capitals (`cap.X`) or the small letters (a glyph drawn in the file, such as ñ, wins over its composition), writes `topaz_data.cpp` (constant data only) and, with `--sheet 8` or `--sheet 9`, every glyph as text. Characters 127 to 159 share the default glyph (a dotted box). |
 | `graphics.sources` | The files the face's build-amiga.sh builds into graphics.library. |
 | `tests/m68k/test_gfx_text.sh` | Runs the core under qemu-m68k on the 68040 at -O0 and -O2. It checks against `test_gfx_text_model.py`, an independent python3 model made at test time (details below). |
-| `tests/TextABITest.c` | Every call side by side with OS 3.2's graphics.library (on the Amiga, against `opengfx.library`), plus a `PROBE` mode that prints OS 3.2's answer for each "ABI test" corner below. |
+| `tests/TextABITest.c` | Every call side by side with OS 3.2's graphics.library (on the Amiga, against `gfopengfx.library`), plus a `PROBE` mode that prints OS 3.2's answer for each "ABI test" corner below. |
 
 The model generates random fonts: one-colour, colour, proportional, kerned, right to left, and with images that overhang their advance. It also generates random strings, AlgoStyles, TxSpacings, draw modes, masks and pens. The test checks:
 

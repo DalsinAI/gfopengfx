@@ -1,8 +1,8 @@
-/* GfxCoreABITest: OS 3.2's graphics.library and OpenGfx's core side by side.
+/* GfxCoreABITest: OS 3.2's graphics.library and GFOpenGfx's core side by side.
  * Copyright (c) 2026 AmigaChrome Team. MIT.
  *
  * Two identical Chip RAM bitmaps get the same random contents; one call
- * goes through graphics.library on the first and through OpenGfx's
+ * goes through graphics.library on the first and through GFOpenGfx's
  * RastPort calls (library/core/gfx_rp.c) on the second, with the same pens,
  * DrawMode and Mask on an unlayered RastPort. Then every plane byte and the
  * result are compared. Calls: WritePixel, ReadPixel, SetRast,
@@ -386,7 +386,7 @@ static int probe(void)
 /* LAYERS: the same layers on both bitmaps (filled with the same random
  * bytes first, so the covered parts a smart layer keeps start alike). The
  * calls draw in back[] through rpa and rpb; B's back layer stays locked
- * for the round, as OpenGfx holds it while the core draws. */
+ * for the round, as GFOpenGfx holds it while the core draws. */
 static void rnd_rect(WORD *r, LONG w, LONG h, LONG minw, LONG minh)
 {
     LONG x0 = (LONG)(rnd() % (ULONG)(w - minw)), y0 = (LONG)(rnd() % (ULONG)(h - minh));
@@ -1365,7 +1365,7 @@ int main(void)
     if (!arr_a || !arr_b || !areapat || !bltmask) { PutStr("no memory\n"); return 20; }
     open_fonts();
     if (!nfonts) { PutStr("no fonts\n"); return 20; }
-    Printf("OpenGfx core against %s", (LONG)((struct Library *)GfxBase)->lib_IdString);
+    Printf("GFOpenGfx core against %s", (LONG)((struct Library *)GfxBase)->lib_IdString);
     if (layered) Printf("in layers, against %s", (LONG)LayersBase->lib_IdString);
 
     for (r = 0; r < rounds && !(SetSignal(0, 0) & SIGBREAKF_CTRL_C); r++) {

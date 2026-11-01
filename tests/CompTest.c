@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT */
-/* CompTest: OpenLayers' composited mode on the Workbench screen, from the
+/* CompTest: GFOpenLayers' composited mode on the Workbench screen, from the
  * Shell. Copyright (c) 2026 AmigaChrome Team. MIT.
  *
  *   CompTest INFO         is the Workbench screen composited (and how; with 47.102, why not)
@@ -96,7 +96,7 @@ int main(int argc, char **argv)
            composited(s) ? "composited" : "classic");
     if (!stricmp(cmd, "INFO")) {
         static const char *const whys[] = { "composited", "not asked (a custom screen)", "switched off", "not RTG",
-                                            "8-bit", "pixel layout", "OpenGPU on the CPU only", "no OpenGPU", "no memory" };
+                                            "8-bit", "pixel layout", "GFOpenGPU on the CPU only", "no GFOpenGPU", "no memory" };
         struct Layer *l;
         int k = 0;
         LONG w = why(&s->LayerInfo);

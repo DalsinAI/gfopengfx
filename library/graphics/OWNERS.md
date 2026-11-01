@@ -1,6 +1,6 @@
 # graphics.library 47.100: who writes each LVO
 
-OpenGfx's graphics.library is four areas built into one library: gfx-face (`library/graphics/`, this directory), gfx-display (`library/display/`), gfx-text (`library/text/`) and gfx-gels (`library/gels/`). `graphics.lvo` is the jump table; this file says who owns each slot. 172 slots: gfx-display 43, gfx-face 88, gfx-gels 23, gfx-text 18 (the nine private slots are the face's, as stubs answering 0).
+GFOpenGfx's graphics.library is four areas built into one library: gfx-face (`library/graphics/`, this directory), gfx-display (`library/display/`), gfx-text (`library/text/`) and gfx-gels (`library/gels/`). `graphics.lvo` is the jump table; this file says who owns each slot. 172 slots: gfx-display 43, gfx-face 88, gfx-gels 23, gfx-text 18 (the nine private slots are the face's, as stubs answering 0).
 
 ## The contract
 

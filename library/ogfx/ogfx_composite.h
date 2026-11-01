@@ -5,11 +5,11 @@
 #include <stdint.h>
 
 /*
- * OpenGfx premultiplied compositing reference.
+ * GFOpenGfx premultiplied compositing reference.
  *
  * ARGB32 pixels are four bytes in memory in A,R,G,B order. RGB channels are
  * premultiplied by A. These plain-C functions define the byte-exact result
- * future AC090/OpenGPU implementations must reproduce.
+ * future AC090/GFOpenGPU implementations must reproduce.
  *
  * Source and destination rectangles must not partially overlap. Exact
  * src==dst is valid. Strides are bytes per row and must cover width pixels.

@@ -1,30 +1,30 @@
 /* Copyright (c) 2026 AmigaChrome Team. OpenRTG, MIT licence (LICENSE).
  * SPDX-License-Identifier: MIT
  *
- * OpenGfx inside opengpu.library: graphics.library's drawing and text.
+ * GFOpenGfx inside gfopengpu.library: graphics.library's drawing and text.
  *
- * This is opengfx.library 1.1 (amigachrome-guest libraries/opengfx, commit
- * 90aa66f), brought into opengpu.library on 8 October 2026 so one library
+ * This is gfopengfx.library 1.1 (amigachrome-guest libraries/opengfx, commit
+ * 90aa66f), brought into gfopengpu.library on 8 October 2026 so one library
  * does all the drawing (FORK.md records what changed on the way).
  *
- * OpenGfx owns every graphics.library drawing and text patch: Text,
+ * GFOpenGfx owns every graphics.library drawing and text patch: Text,
  * TextLength, TextExtent, TextFit, RectFill, BltBitMap, BltTemplate and
  * ScrollRaster, and from 0.8 BltPattern, SetRast, Draw, PolyDraw,
  * WritePixel, ReadPixel, BltBitMapRastPort, BltMaskBitMapRastPort, ClipBlit,
  * WriteChunkyPixels, WritePixelArray8, WritePixelLine8, ReadPixelLine8 and
- * ReadPixelArray8 (22 in all). OpenFont patches nothing: it supplies glyphs, shaping and
- * metrics. OpenRTG and other RTG systems register a provider for these calls
+ * ReadPixelArray8 (22 in all). GFOpenFont patches nothing: it supplies glyphs, shaping and
+ * metrics. GFOpenRTG and other RTG systems register a provider for these calls
  * instead of installing competing vectors. A call no provider and no leaf
  * takes goes to graphics.library's own code.
  *
- * A look (OpenLook, opengpu.library 0.7) is asked first on RectFill and
+ * A look (GFOpenLook, gfopengpu.library 0.7) is asked first on RectFill and
  * Text, so the system's look is drawn here instead of by a second patch.
  *
  * Programs reach the same code two ways: through graphics.library, once
  * OGFX_InstallPatches has pointed its eight vectors here, or through
- * opengpu.library's own LVOs (include/opengpu/gfx.h).
+ * gfopengpu.library's own LVOs (include/gfopengpu/gfx.h).
  *
- * No writable globals: the state is in opengpu.library's base (ogfx.h).
+ * No writable globals: the state is in gfopengpu.library's base (ogfx.h).
  */
 #include <exec/types.h>
 #include <exec/memory.h>
@@ -43,10 +43,10 @@
 
 #define REG OGFX_REG
 
-/* Zorro manufacturer of AmigaChrome's own boards (amigachrome-guest
+/* Zorro manufacturer of AmiCradle's own boards (amigachrome-guest
  * common/protocol/amigachrome_zorro.h). The old id, 2011, is shared with UAE and
  * home-made boards, so it is not taken as proof. */
-#define OGFX_AMIGACHROME_MANUFACTURER 0xDA15
+#define OGFX_AMICRADLE_MANUFACTURER 0xDA15
 
 /* graphics.library's vectors, in OGFX_P_ order. */
 static const WORD lvo_of[OGFX_P_COUNT] = {
@@ -118,7 +118,7 @@ static inline struct ogfx_state *state_of(struct Library *base)
 }
 
 /* graphics.library's code for call p: the vector before the patches, or,
- * with no patches in, graphics.library's vector as it stands (so OpenGfx's
+ * with no patches in, graphics.library's vector as it stands (so GFOpenGfx's
  * own LVOs never call themselves). */
 static APTR original(struct ogfx_state *st, struct GfxBase *gfx, int p)
 {
@@ -165,7 +165,7 @@ static int chip_planes(struct ogfx_state *st, struct BitMap *bm)
 
 /* Whether a leaf may draw on these bitmaps' planes now. Chip RAM: on a real
  * Amiga the blitter is the better answer there, so graphics.library keeps
- * it (OPENGFX_DESIGN.md section 5); on AmigaChrome the leaf runs as host
+ * it (OPENGFX_DESIGN.md section 5); on AmiCradle the leaf runs as host
  * code and takes it. Either way the CPU must not touch planes a queued blit
  * may still be drawing, so it waits for the blitter first. */
 static int cpu_may_draw(struct ogfx_state *st, struct GfxBase *GfxBase,
@@ -227,7 +227,7 @@ static LONG try_planar_bltbitmap(struct ogfx_state *st, struct GfxBase *GfxBase,
 
     if (!src || !dst || !result || dx < 0 || dy < 0)
         return 0;
-    /* Chip RAM stays with the blitter, on AmigaChrome too: there the blitter
+    /* Chip RAM stays with the blitter, on AmiCradle too: there the blitter
      * copies 640 x 480 x 8 planes in 0.2 ms and the planar-blit leaf (one bit
      * at a time, as host code) takes 12 ms; a 64 x 64 copy 0.05 against 0.9
      * (OpenGfxCheck, 8 October 2026). The leaf takes Fast RAM bitmaps, which
@@ -505,8 +505,8 @@ OGFX_CALL void do_rectfill(struct ogfx_state *st, struct GfxBase *gfx, struct Ra
     if (st->have_look && look_rectfill(st, rp, x0, y0, x1, y1))
         return;
 
-    /* Providers own foreign bitmap semantics (for example OpenRTG) and
-     * remain active when native OpenGfx acceleration is disabled. */
+    /* Providers own foreign bitmap semantics (for example GFOpenRTG) and
+     * remain active when native GFOpenGfx acceleration is disabled. */
     if (st->have_provider && st->provider.v1.rectfill) {
         struct OGFXRectFillRequest r;
         r.rp = rp; r.x0 = x0; r.y0 = y0; r.x1 = x1; r.y1 = y1;
@@ -590,8 +590,8 @@ OGFX_CALL void do_scroll(struct ogfx_state *st, struct GfxBase *gfx, struct Rast
     ((scroll_fn)original(st, gfx, OGFX_P_SCROLLRASTER))(rp, dx, dy, x0, y0, x1, y1, gfx);
 }
 
-/* The text measurement calls and BltTemplate: the provider (OpenRTG, and
- * through OpenGfx OpenFont's metrics when they come), else graphics.library's
+/* The text measurement calls and BltTemplate: the provider (GFOpenRTG, and
+ * through GFOpenGfx GFOpenFont's metrics when they come), else graphics.library's
  * own code, so a program measures text as it is drawn. */
 OGFX_CALL WORD do_textlength(struct ogfx_state *st, struct GfxBase *gfx, struct RastPort *rp,
                           STRPTR text, ULONG length)
@@ -663,9 +663,9 @@ OGFX_CALL void do_blttemplate(struct ogfx_state *st, struct GfxBase *gfx, PLANEP
 }
 
 /* ---- 0.8: the fourteen other drawing calls -----------------------------------
- * The provider (OpenRTG) first, with the arguments as graphics.library reads
+ * The provider (GFOpenRTG) first, with the arguments as graphics.library reads
  * them, then graphics.library's own code with the registers as they came.
- * OpenGfx has no native path for these yet. */
+ * GFOpenGfx has no native path for these yet. */
 typedef void (*bltpattern_fn)(REG(a1, struct RastPort *), REG(a0, PLANEPTR), REG(d0, LONG), REG(d1, LONG),
                               REG(d2, LONG), REG(d3, LONG), REG(d4, LONG), REG(a6, struct GfxBase *));
 typedef void (*setrast_fn)(REG(a1, struct RastPort *), REG(d0, ULONG), REG(a6, struct GfxBase *));
@@ -1001,14 +1001,14 @@ LONG OGFX_InstallPatches(REG(a6, struct Library *base))
     if (!(gfx = (struct Library *)gfx_of(st)))
         return 0;
 
-    /* AmigaChrome: boards with the AmigaChrome Team's own id (0xDA15) are there and nowhere
+    /* AmiCradle: boards with the AmiCradle Team's own id (0xDA15) are there and nowhere
      * else. The old id, 2011, is shared with UAE and home-made boards, so it
      * is not taken as proof: a runtime from before 1 Oct 2026 just keeps
      * Chip RAM on the blitter. */
     {
         struct Library *ExpansionBase = OpenLibrary((CONST_STRPTR)expansion_name, 37);
         if (ExpansionBase) {
-            st->amigachrome = FindConfigDev(NULL, OGFX_AMIGACHROME_MANUFACTURER, -1) != NULL;
+            st->amigachrome = FindConfigDev(NULL, OGFX_AMICRADLE_MANUFACTURER, -1) != NULL;
             CloseLibrary(ExpansionBase);
         }
     }
@@ -1042,7 +1042,7 @@ ULONG OGFX_Status(REG(a6, struct Library *base))
     if (st->patched) status |= OGFX_STATUS_PATCHED;
     if (st->enabled) status |= OGFX_STATUS_ENABLED;
     if (st->have_provider) status |= OGFX_STATUS_PROVIDER;
-    if (st->amigachrome) status |= OGFX_STATUS_AMIGACHROME;
+    if (st->amigachrome) status |= OGFX_STATUS_AMICRADLE;
     if (st->have_look) status |= OGFX_STATUS_LOOK;
     if (st->look_busy) status |= OGFX_STATUS_LOOK_BUSY;
     return status;
@@ -1128,7 +1128,7 @@ LONG OGFX_UnregisterLook(REG(a0, APTR owner), REG(a6, struct Library *base))
 }
 
 /* The drawing LVOs: the same code as the patches, for programs that call
- * opengpu.library directly. Without graphics.library they do nothing. */
+ * gfopengpu.library directly. Without graphics.library they do nothing. */
 
 LONG OGFX_Text(REG(a1, struct RastPort *rp), REG(a0, STRPTR text), REG(d0, ULONG length),
                REG(a6, struct Library *base))

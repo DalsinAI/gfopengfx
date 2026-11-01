@@ -1,8 +1,8 @@
-/* TextABITest: OpenGfx's text calls (library/text) side by side with OS
+/* TextABITest: GFOpenGfx's text calls (library/text) side by side with OS
  * 3.2's graphics.library. Copyright (c) 2026 AmigaChrome Team. MIT.
  *
- * Opens OS 3.2's graphics.library and OpenGfx's built under its own name
- * (opengfx.library, library/graphics/build-amiga.sh) and makes each call
+ * Opens OS 3.2's graphics.library and GFOpenGfx's built under its own name
+ * (gfopengfx.library, library/graphics/build-amiga.sh) and makes each call
  * through both, switching GfxBase. Fonts made here (one-colour, proportional,
  * kerned, colour and right to left) are handed to both, so the pixels must
  * match; each library's own topaz is compared by its measures only (ours
@@ -12,7 +12,7 @@
  * SetSoftStyle, AskFont, SetFont's RastPort fields, OpenFont's choice,
  * WeighTAMatch, ClearEOL and ClearScreen. A DIFF line shows both answers.
  *
- *   TextABITest [ROUNDS=n] [LIB=name]   (default 300, opengfx.library)
+ *   TextABITest [ROUNDS=n] [LIB=name]   (default 300, gfopengfx.library)
  *   TextABITest PROBE                   (OS 3.2's answers for every corner
  *                                        README.md's Edge cases calls an
  *                                        ABI test, one PROBE line each)
@@ -493,7 +493,7 @@ static void probe(void)
 int main(int argc, char **argv)
 {
     ULONG rounds = 300, i;
-    const char *lib = "opengfx.library";
+    const char *lib = "gfopengfx.library";
     int doprobe = 0, a;
     for (a = 1; a < argc; a++) {
         if (!strncmp(argv[a], "ROUNDS=", 7)) rounds = (ULONG)atoi(argv[a] + 7);

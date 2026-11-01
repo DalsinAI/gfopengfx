@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""OpenGfx and OpenLayers: every argument narrow_args.txt lists (NDK 3.2's
+"""GFOpenGfx and GFOpenLayers: every argument narrow_args.txt lists (NDK 3.2's
 SFDs give it as WORD, UWORD, BYTE, UBYTE or BOOL) is taken narrow by its LVO
 entry, or cast to that width in the entry's body: a caller built with NDK
 3.2's inlines sets only the low part of the register.

@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT */
-/* OpenGfx graphics.library, the face's calls in plain C arguments.
+/* GFOpenGfx graphics.library, the face's calls in plain C arguments.
  * Copyright (c) 2026 AmigaChrome Team. MIT.
  *
  * gfx_face.cpp (lean C++, no Amiga headers) does the work: bitmaps and

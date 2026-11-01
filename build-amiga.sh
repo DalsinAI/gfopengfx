@@ -1,17 +1,17 @@
 #!/bin/sh
-# OpenGfx with the os32-gcc16 stove: builds GfxCoreABITest, OpenGfx's core
+# GFOpenGfx with the os32-gcc16 stove: builds GfxCoreABITest, GFOpenGfx's core
 # and RastPort calls side by side with OS 3.2's graphics.library, and
 # RegionABITest, its regions likewise.
 #   sh build-amiga.sh   (out: build-amiga/GfxCoreABITest, RegionABITest)
 set -eu
 HERE=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-STOVE=${STOVE:-"$HOME/AmigaChrome/stoves/os32-gcc16"}
+STOVE=${STOVE:-"$HOME/AmiCradle/stoves/os32-gcc16"}
 CC=${CC:-"$STOVE/prefix/bin/m68k-amigaos-gcc"}
 OUT=${OUT:-"$HERE/build-amiga"}
 mkdir -p "$OUT"
-# OpenAmigaGCC 16.2.0-open3's late-combine pass can store a copy one place late (GCC PR 123853): GfxCoreABITest's
+# GFOpenAmigaGCC 16.2.0-open3's late-combine pass can store a copy one place late (GCC PR 123853): GfxCoreABITest's
 # open_fonts copied its test font's tables as "move.w (a0)+,(a0,d2.l)", each word one place late. Off until
-# OpenAmigaGCC open4 (openamigagcc #29), on a compiler that knows the option. Not in library/graphics or
+# GFOpenAmigaGCC open4 (openamigagcc #29), on a compiler that knows the option. Not in library/graphics or
 # library/layers: their builds are the ROM's (Team 4's), which W128 found clean.
 LATE=""
 if "$CC" -fno-late-combine-instructions -S -o /dev/null -x c /dev/null 2>/dev/null; then LATE="-fno-late-combine-instructions"; fi

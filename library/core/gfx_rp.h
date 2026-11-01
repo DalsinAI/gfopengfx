@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT */
-/* OpenGfx's RastPort calls: graphics.library's arguments and results, on a
+/* GFOpenGfx's RastPort calls: graphics.library's arguments and results, on a
  * RastPort with no layer, through the core (gfx_core.h). Copyright (c) 2026
  * AmigaChrome Team. MIT.
  *

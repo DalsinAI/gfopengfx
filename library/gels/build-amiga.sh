@@ -1,5 +1,5 @@
 #!/bin/sh
-# OpenGfx gels with the os32-gcc16 stove (GCC 16.2.0-open2). The gels go
+# GFOpenGfx gels with the os32-gcc16 stove (GCC 16.2.0-open2). The gels go
 # into graphics.library through library/gels/graphics.sources, built by
 # library/graphics/build-amiga.sh; this builds that, then
 #   GelsABITest   the gels and blitter calls side by side with OS 3.2's
@@ -7,14 +7,14 @@
 set -eu
 HERE=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 TOP=$(CDPATH= cd -- "$HERE/../.." && pwd)
-STOVE=${STOVE:-"$HOME/AmigaChrome/stoves/os32-gcc16"}
+STOVE=${STOVE:-"$HOME/AmiCradle/stoves/os32-gcc16"}
 P="$STOVE/prefix"
 CC=${CC:-"$P/bin/m68k-amigaos-gcc"}
 OUT=${OUT:-"$TOP/library/graphics/build-amiga"}
 sh "$TOP/library/graphics/build-amiga.sh"
 mkdir -p "$OUT/tests"
-# OpenAmigaGCC 16.2.0-open3's late-combine pass can store a copy one place late (GCC PR 123853;
-# GfxCoreABITest's font tables came out so): GelsABITest is built with the pass off until OpenAmigaGCC open4
+# GFOpenAmigaGCC 16.2.0-open3's late-combine pass can store a copy one place late (GCC PR 123853;
+# GfxCoreABITest's font tables came out so): GelsABITest is built with the pass off until GFOpenAmigaGCC open4
 # (openamigagcc #29), on a compiler that knows the option. library/graphics/build-amiga.sh (run above; the ROM's build)
 # is left as it is.
 LATE=""

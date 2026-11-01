@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""OpenGfx graphics.library: makes gfx_vectors.h (the vector table, in
+"""GFOpenGfx graphics.library: makes gfx_vectors.h (the vector table, in
 graphics.lvo's order) and gfx_stubs.c (a stub for every gfx_lvo_, gfx_init_,
 gfx_exit_ and gfx_hook_ symbol no area's objects define, so the library
 links with any subset of the areas; OWNERS.md).

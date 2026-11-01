@@ -1,10 +1,10 @@
 /* SPDX-License-Identifier: MIT */
 /* A copy of amigachrome-guest common/amiga/ac_magic.h (at 90aa66f), the
- * source of truth for the tag and the published ids: OpenGfx's leaves need
+ * source of truth for the tag and the published ids: GFOpenGfx's leaves need
  * it, and openamigartg builds on its own. Change the ids there first. */
 #ifndef AC_MAGIC_H
 #define AC_MAGIC_H
-/* Magic functions: a function of ours that runs as host code on AmigaChrome
+/* Magic functions: a function of ours that runs as host code on AmiCradle
  * and as its own 68k code everywhere else (amigachrome's
  * docs/architecture/MAGIC_FUNCTIONS_AND_BRIDGE.md, part 1, and
  * machines/cpus/m68k-ac090/native/jit_magic.c).
@@ -13,7 +13,7 @@
  *     BRA.S   *+12            ; $600A: a real Amiga branches over the tag
  *     DC.L    'ACMF'
  *     DC.W    $0001           ; the tag's version
- *     DC.L    id              ; who (AmigaChrome Team is 1) in the top half, which below
+ *     DC.L    id              ; who (AmiCradle Team is 1) in the top half, which below
  *     JMP     name_acbody
  * When AC090 translates the entry and knows the id, it runs its native
  * version instead, after checking the call (plain RAM only, no overlap it
@@ -48,7 +48,7 @@
  *   -fno-lto when it goes into a static library.
  *
  * The ids are a published list: a PiStorm's Emu68 or an FPGA accelerator
- * may honour the same tags. AmigaChrome Team's (1 in the top half) are below; a new
+ * may honour the same tags. AmiCradle Team's (1 in the top half) are below; a new
  * one is added here and in jit_magic.c's magic_defs together. */
 
 /* void *memcpy(void *dst, const void *src, size_t n): dst. AC090 declines
@@ -75,7 +75,7 @@
  * either half 65521 or more to the body (zlib never makes one), and one
  * with a NULL buf and len 1, which zlib reads anyway. */
 #define AC_MAGIC_ADLER32 0x00010007
-/* OpenGfx's leaves (openamigartg library/ogfx/ogfx_leaves.h, SPD-11): each takes
+/* GFOpenGfx's leaves (openamigartg library/ogfx/ogfx_leaves.h, SPD-11): each takes
  * one parameter block and returns how much it drew. AC090 leaves a block
  * that reaches anything but plain memory, or whose arithmetic would wrap
  * past 4 GB, to the body. */

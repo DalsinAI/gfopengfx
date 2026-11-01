@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT */
-/* OpenGfx text: graphics.library's text LVOs, taking their registers
+/* GFOpenGfx text: graphics.library's text LVOs, taking their registers
  * (graphics.lvo, library/graphics/OWNERS.md) and coming to the core
  * (text_core.h). Copyright (c) 2026 AmigaChrome Team. MIT.
  *
@@ -26,7 +26,7 @@
 
 /* Arguments NDK 3.2's protos give as WORD, UWORD, BYTE, UBYTE or BOOL are
  * cast to that width where they are handed on: a caller built with those
- * inlines sets only the low part of the register (measured: OpenIntuition's
+ * inlines sets only the low part of the register (measured: GFOpenIntuition's
  * WhichLayer call left d0's upper word as it was). */
 #ifndef GFX_REG
 #define GFX_REG(r, decl) decl

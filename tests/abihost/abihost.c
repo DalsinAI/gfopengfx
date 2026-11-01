@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT */
-/* LayersABITest on the host, over OpenLayers' own code: exec, dos and
+/* LayersABITest on the host, over GFOpenLayers' own code: exec, dos and
  * graphics.library played closely enough that its PROBE lines can be set
  * beside the ones OS 3.2 gave on an Amiga. Copyright (c) 2026 AmigaChrome
  * Team. MIT.
@@ -35,7 +35,7 @@ void ReleaseSemaphore(struct SignalSemaphore *s)
     if (--s->ss_NestCount < 0) { fprintf(stderr, "semaphore released too often\n"); exit(20); }
 }
 
-static struct Library lib = { { 0 }, (APTR)"layers.library 47.100 (host) OpenLayers\n" };
+static struct Library lib = { { 0 }, (APTR)"layers.library 47.100 (host) GFOpenLayers\n" };
 struct Library *OpenLibrary(const char *name, ULONG version)
 {
     static int done;

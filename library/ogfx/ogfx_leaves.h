@@ -1,9 +1,9 @@
 /* SPDX-License-Identifier: MIT */
 #ifndef OGFX_LEAVES_H
 #define OGFX_LEAVES_H
-/* OpenGfx's leaves (SPD-11, first slice): graphics.library's drawing work
+/* GFOpenGfx's leaves (SPD-11, first slice): graphics.library's drawing work
  * on a bitmap's own memory, as magic functions (ac_magic.h).
- * On AmigaChrome's AC090 a call runs as host code; on a real Amiga, a
+ * On AmiCradle's AC090 a call runs as host code; on a real Amiga, a
  * PiStorm or another emulator the C in ogfx_leaves.c runs. Each takes one
  * parameter block (32-bit fields, the Amiga's byte order) and returns how
  * much it drew, 0 when the block asks for nothing it can do.

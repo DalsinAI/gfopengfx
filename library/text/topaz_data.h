@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// OpenGfx text: the ROM fonts' data (topaz_data.cpp, made by mkfont.py).
+// GFOpenGfx text: the ROM fonts' data (topaz_data.cpp, made by mkfont.py).
 // Copyright (c) 2026 AmigaChrome Team. MIT.
 #ifndef OPENGFX_TOPAZ_DATA_H
 #define OPENGFX_TOPAZ_DATA_H

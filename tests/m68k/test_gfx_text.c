@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT */
-/* OpenGfx text (library/text) under qemu-m68k: every call against the
+/* GFOpenGfx text (library/text) under qemu-m68k: every call against the
  * python model's answers (test_gfx_text_model.py, cases.h), the one-colour
  * text the core draws itself checked pixel for pixel against library/core's
  * Text on a planar bitmap, the ROM fonts' data against their drawing, the

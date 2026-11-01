@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT */
-/* OpenGfx display: graphics.library's View, ViewPort, copper, display
+/* GFOpenGfx display: graphics.library's View, ViewPort, copper, display
  * database, monitor, beam and sprite calls in plain C arguments.
  * Copyright (c) 2026 AmigaChrome Team. MIT.
  *
@@ -20,7 +20,7 @@ extern "C" {
 
 /* Once from gfx_init_display: chip revision, monitors, copinit, the
  * sprite table; answers 1, or 0 out of memory. With own_hw 0 (the
- * side-by-side opengfx.library, next to OS 3.2's graphics.library) every
+ * side-by-side gfopengfx.library, next to OS 3.2's graphics.library) every
  * call works on memory as usual but no custom chip register is written:
  * the display stays the OS's. gd_exit gives it all back (side-by-side
  * build only). */

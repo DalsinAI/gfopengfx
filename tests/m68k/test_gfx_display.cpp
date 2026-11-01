@@ -1015,7 +1015,7 @@ static void fetch_modes(int chip)
     printf("fetch chip %d done\n", chip);
 }
 
-/* opengfx.library next to OS 3.2's graphics.library: the same calls, no
+/* gfopengfx.library next to OS 3.2's graphics.library: the same calls, no
  * custom chip register written */
 static void side_by_side()
 {

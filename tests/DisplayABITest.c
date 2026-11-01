@@ -1,10 +1,10 @@
 /* SPDX-License-Identifier: MIT */
-/* DisplayABITest: OpenGfx graphics.library's display (library/display)
+/* DisplayABITest: GFOpenGfx graphics.library's display (library/display)
  * side by side with OS 3.2's graphics.library. Copyright (c) 2026 AmigaChrome
  * Team. MIT.
  *
  * One script of calls is run through OS 3.2's graphics.library and then
- * through opengfx.library (OpenGfx's graphics.library under its own
+ * through gfopengfx.library (GFOpenGfx's graphics.library under its own
  * name), each writing its answers as lines; then the lines are compared
  * and each one that differs is printed with both answers. The script is
  * the corners the autodocs leave open, each marked "ABI test" in
@@ -19,9 +19,9 @@
  * (DIWSTRT, DDFSTRT, BPLCON1, the modulos, plane 1's offset in the
  * bitmap): the lists themselves are private and differ, what they show
  * must not. Nothing is loaded into the display: no LoadView; opened as
- * opengfx.library the library leaves the custom chips alone. Boot with
+ * gfopengfx.library the library leaves the custom chips alone. Boot with
  * DEVS:Monitors empty: OS 3.2 adds each driver's modes to its database,
- * OpenGfx has the built-in PAL and NTSC ones only.
+ * GFOpenGfx has the built-in PAL and NTSC ones only.
  * With PROBE it prints OS 3.2's lines only, to record them.
  *   DisplayABITest [PROBE] [LIB=dir]
  * Answers 0 when nothing differs, 5 when something does. */
@@ -485,7 +485,7 @@ int main(int argc, char **argv)
     if (!(os_base = (struct GfxBase *)OpenLibrary("graphics.library", 39))) { printf("no graphics.library\n"); rc = 20; goto done; }
     if (!probe) {
         strcpy(path, dir ? dir : "LIBS:");
-        AddPart(path, "opengfx.library", sizeof path);
+        AddPart(path, "gfopengfx.library", sizeof path);
         if (!(our_base = (struct GfxBase *)OpenLibrary(path, 47))) { printf("no %s\n", path); rc = 20; goto done; }
     }
     printf("OS: %s", (char *)os_base->LibNode.lib_IdString);

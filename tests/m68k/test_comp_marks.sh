@@ -1,6 +1,6 @@
 #!/bin/sh
-# OpenLayers' composited mode: what each drawing call marks
-# (library/layers/layers_mark.h) against what OpenGfx's core and text draw,
+# GFOpenLayers' composited mode: what each drawing call marks
+# (library/layers/layers_mark.h) against what GFOpenGfx's core and text draw,
 # under qemu-m68k on the 68040 at -O0 and -O2 (tests/m68k/test_comp_marks.c).
 #   sh tests/m68k/test_comp_marks.sh
 set -eu

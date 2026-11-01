@@ -1,5 +1,5 @@
 #!/bin/sh
-# OpenGfx gels (library/gels/gels_core.cpp, lean C++) for the 68040
+# GFOpenGfx gels (library/gels/gels_core.cpp, lean C++) for the 68040
 # at -O0 and -O2, each run on that CPU under qemu-m68k on a
 # simulated machine (tests/m68k/test_gfx_gels.c: Chip and Fast RAM, a
 # blitter from the Hardware Reference Manual, its interrupt, the beam,

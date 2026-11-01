@@ -44,7 +44,7 @@
  * semaphores as OS 3.2 does. */
 #define NEWCLIPRECTS_1_1                /* struct ClipRect's Flags: CR_OPENLAYERS_COMPOSED */
 #ifndef CR_OPENLAYERS_COMPOSED
-#define CR_OPENLAYERS_COMPOSED  0x40000000L   /* as include/graphics/openlayers.h */
+#define CR_OPENLAYERS_COMPOSED  0x40000000L   /* as include/graphics/gfopenlayers.h */
 #endif
 #include <exec/types.h>
 #include <exec/memory.h>

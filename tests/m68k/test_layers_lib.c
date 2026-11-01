@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT */
-/* OpenLayers' library code (library/layers/layers_lib.c) against a model.
+/* GFOpenLayers' library code (library/layers/layers_lib.c) against a model.
  * Copyright (c) 2026 AmigaChrome Team. MIT.
  *
  * exec and graphics.library are played here: bitmaps are a byte a pixel,

@@ -1,5 +1,5 @@
 #!/bin/sh
-# OpenGfx graphics.library's face (library/graphics) under qemu-m68k: the
+# GFOpenGfx graphics.library's face (library/graphics) under qemu-m68k: the
 # lean C++ face with the core (library/core), built with an m68k cross
 # GCC for the 68040 at -O0 and -O2, each run on that CPU
 # by tests/m68k/test_gfx_face.c, whose every line a python3 model written
@@ -58,7 +58,7 @@ inc="-I$g -I$core -I$here/gfx_face_ndk -I$here/../host-ndk"
 
 cat > "$tmp/model.py" <<'PY'
 # The model: what each line of test_gfx_face.c's output must say, from
-# graphics.library's autodocs and OpenGfx's documented choices (the README's
+# graphics.library's autodocs and GFOpenGfx's documented choices (the README's
 # edge cases), computed here pixel by pixel and entry by entry.
 import sys
 

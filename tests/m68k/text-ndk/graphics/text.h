@@ -1,5 +1,5 @@
 /* host NDK overlay (tests only): graphics/text.h for building
- * library/core/gfx_rp.c next to OpenGfx's text calls in
+ * library/core/gfx_rp.c next to GFOpenGfx's text calls in
  * tests/m68k/test_gfx_text.sh. Clean-room, from the published layouts
  * (offsets checked by text_types.h's static_asserts on the m68k).
  * MIT, AmigaChrome Team. */

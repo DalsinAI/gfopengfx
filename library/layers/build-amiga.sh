@@ -1,15 +1,15 @@
 #!/bin/sh
-# OpenLayers with the os32-gcc16 stove: checks layers.lvo against the
+# GFOpenLayers with the os32-gcc16 stove: checks layers.lvo against the
 # NDK 3.2 layers_lib.fd, then builds
 #   layers.library       the replacement (47.100), a resident module
-#   openlayers.library   the same code under its own name, for the ABI test
+#   gfopenlayers.library   the same code under its own name, for the ABI test
 #   LayersABITest        runs the same calls through both and lists every difference
 # The amigachrome-guest checkout with libraries/common/check_fd.py:
 #   GUEST=~/src/amigachrome-guest sh library/layers/build-amiga.sh
 set -eu
 
 HERE=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-STOVE=${STOVE:-"$HOME/AmigaChrome/stoves/os32-gcc16"}
+STOVE=${STOVE:-"$HOME/AmiCradle/stoves/os32-gcc16"}
 P="$STOVE/prefix"
 CC=${CC:-"$P/bin/m68k-amigaos-gcc"}
 OUT=${OUT:-"$HERE/build-amiga"}
@@ -30,7 +30,7 @@ LIBFLAGS="-m68040 $OPT -fno-strict-aliasing -fno-delete-null-pointer-checks -fom
 # COMPOSITE=0 builds classic layers only, as before it
 COMP=${COMPOSITE:-1}
 [ "$COMP" = 0 ] && CDEF= || CDEF=-DOL_COMPOSITE
-for name in layers openlayers; do
+for name in layers gfopenlayers; do
   # shellcheck disable=SC2086
   "$CC" $LIBFLAGS $CDEF -DLIBNAME="\"$name.library\"" -I"$HERE" -I"$HERE/../../include" -o "$OUT/libs/$name.library" \
     "$HERE/openlayers_lib.c" "$HERE/layers_lib.c" "$HERE/layers_core.c" -lgcc

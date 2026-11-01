@@ -1,5 +1,5 @@
 #!/bin/sh
-# OpenGfx's core (library/core/gfx_core.c) built with an m68k cross GCC for
+# GFOpenGfx's core (library/core/gfx_core.c) built with an m68k cross GCC for
 # the 68040 at -O0 and -O2, each run on that CPU under
 # qemu-m68k, against a plain model: an array of pens drawn one pixel at a
 # time. Random bitmaps

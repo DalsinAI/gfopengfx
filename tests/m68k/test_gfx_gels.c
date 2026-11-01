@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT */
-/* OpenGfx gels (library/gels/gels_core.cpp) on a simulated Amiga: Chip and
+/* GFOpenGfx gels (library/gels/gels_core.cpp) on a simulated Amiga: Chip and
  * Fast RAM, a blitter written from the Hardware Reference Manual (it runs
  * a blit only when it finishes, a few DMACONR reads after BLTSIZE, so a
  * CPU write before WaitBlit shows), its interrupt (held while Disable()d),

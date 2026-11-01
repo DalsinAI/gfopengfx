@@ -42,7 +42,7 @@ static inline state *st(gfx_env *env)
     return static_cast<state *>(gfx_private_of(env->base)->area[GFX_AREA_DISPLAY]);
 }
 /* A custom chip register write, dropped when the display is the OS's
- * (opengfx.library opened next to it for the ABI tests) */
+ * (gfopengfx.library opened next to it for the ABI tests) */
 static inline void put(gfx_env *env, uint32_t reg, uint16_t v)
 {
     state *s = st(env);

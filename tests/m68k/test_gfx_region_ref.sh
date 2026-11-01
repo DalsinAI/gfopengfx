@@ -1,5 +1,5 @@
 #!/bin/sh
-# OpenGfx's regions (library/core/gfx_region.c) against the regions as they
+# GFOpenGfx's regions (library/core/gfx_region.c) against the regions as they
 # were at 6c8b6d90 (gfx_region_ref.c, every call a sweep of the whole
 # region), built with an m68k cross GCC for the 68040 at -O0 and -O2 and run
 # under qemu-m68k. Thousands of random calls are made on both, the same

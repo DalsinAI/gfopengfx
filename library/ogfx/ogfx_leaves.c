@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT */
-/* OpenGfx's leaves (ogfx_leaves.h): the reference C, behind ac_magic.h's
+/* GFOpenGfx's leaves (ogfx_leaves.h): the reference C, behind ac_magic.h's
  * tags. AC090 runs its host versions instead (amigachrome's jit_magic.c);
  * everything else runs this. Build it as ac_helpers.sh builds the helpers:
  * GCC, 32-bit ints, arguments on the stack (not -mregparm), with -fno-lto,
