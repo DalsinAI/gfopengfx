@@ -1,4 +1,4 @@
-/* host NDK (tests only): the graphics calls OpenLayers makes; the test supplies them. */
+/* host NDK (tests only): the graphics calls GFOpenLayers makes; the test supplies them. */
 #ifndef PROTO_GRAPHICS_H
 #define PROTO_GRAPHICS_H
 #include <graphics/rastport.h>

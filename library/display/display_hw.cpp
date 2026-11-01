@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT */
-/* OpenGfx display: the beam, the chip revision and the sprites.
+/* GFOpenGfx display: the beam, the chip revision and the sprites.
  * Copyright (c) 2026 AmigaChrome Team. MIT.
  *
  * Clean-room: from graphics.library's autodocs (VBeamPos, WaitTOF,

@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT */
-/* OpenGfx graphics.library: the gels LVOs in their registers, gels' init,
+/* GFOpenGfx graphics.library: the gels LVOs in their registers, gels' init,
  * and the calls into user code that need registers. Copyright (c) 2026
  * AmigaChrome Team. MIT.
  *
@@ -14,7 +14,7 @@
 
 /* Arguments NDK 3.2's protos give as WORD, UWORD, BYTE, UBYTE or BOOL are
  * cast to that width where they are handed on: a caller built with those
- * inlines sets only the low part of the register (measured: OpenIntuition's
+ * inlines sets only the low part of the register (measured: GFOpenIntuition's
  * WhichLayer call left d0's upper word as it was). */
 #ifndef GFX_REG
 #define GFX_REG(r, decl) decl
@@ -115,7 +115,7 @@ static const char blit_name[] = "graphics blitter";
 static const char vertb_name[] = "graphics QBSBlit";
 
 /* The blitter is ours only as graphics.library; opened next to OS 3.2's
- * as opengfx.library, the OS's graphics.library keeps the blitter, its
+ * as gfopengfx.library, the OS's graphics.library keeps the blitter, its
  * queue and its interrupt vector, and every blit of ours is the CPU's (as
  * the display leaves the custom chips alone there, display_lvo.c). Its
  * blitter is shared, so it is still waited for and owned: OwnBlitter,

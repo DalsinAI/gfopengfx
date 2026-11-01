@@ -1,5 +1,5 @@
 #!/bin/sh
-# OpenGfx's regions (library/core/gfx_region.c) built with an m68k cross GCC
+# GFOpenGfx's regions (library/core/gfx_region.c) built with an m68k cross GCC
 # for the 68040 at -O0 and -O2, each run on that CPU under
 # qemu-m68k, against a plain model: a grid of cells, one a pixel. Random
 # rectangles (some empty, some negative) and every Rect and Region call on

@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT */
-/* OpenGfx graphics.library: the env every area's core reaches exec, the
+/* GFOpenGfx graphics.library: the env every area's core reaches exec, the
  * machine and the other areas through. Copyright (c) 2026 AmigaChrome Team.
  * MIT.
  *
@@ -77,14 +77,14 @@ struct gfx_env {
     uint32_t (*type_of_mem)(void *ctx, const void *p);
 
     /* SetRGB32 through the library's own vector, so that a card's driver
-     * that patched it (OpenRTG, Picasso96) hears of a colour graphics sets
+     * that patched it (GFOpenRTG, Picasso96) hears of a colour graphics sets
      * itself: a pen ObtainPen or ObtainBestPenA gives out. May be 0 (the
      * tests): the face then sets the map and calls gfx_hook_vp_colors. */
     void (*set_rgb32_vector)(void *ctx, void *vp, uint32_t n, uint32_t r, uint32_t g, uint32_t b);
 
     /* GetBitMapAttr and RectFill through the library's own vectors, for a
      * bitmap the core does not draw: one a card's driver made and answers
-     * BMA_FLAGS for without BMF_STANDARD (OpenRTG does). The
+     * BMA_FLAGS for without BMF_STANDARD (GFOpenRTG does). The
      * face then draws DrawEllipse and EraseRect's default fill with the
      * RectFill the driver patched. May be 0 (the tests): every bitmap with
      * 8 planes or fewer is then the core's. */

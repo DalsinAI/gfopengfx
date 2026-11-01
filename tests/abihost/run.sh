@@ -1,5 +1,5 @@
 #!/bin/sh
-# LayersABITest's PROBE run on the host over OpenLayers (tests/abihost),
+# LayersABITest's PROBE run on the host over GFOpenLayers (tests/abihost),
 # set beside OS 3.2's PROBE lines from an Amiga when a file of them is given.
 #   sh tests/abihost/run.sh [os-probe.txt] [ROUNDS=n]
 set -eu

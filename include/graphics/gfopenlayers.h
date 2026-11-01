@@ -2,7 +2,7 @@
 /* OpenLayers' own calls: the composited mode. Copyright (c) 2026 AmigaChrome
  * Team. MIT.
  *
- * layers.library 47.101 and up (OpenLayers; OS 3.2's layers.library has
+ * layers.library 47.101 and up (GFOpenLayers; OS 3.2's layers.library has
  * none of these: check lib_Version 47 and lib_Revision >= 101 first). The
  * calls follow OS 3.2's last LVO (SetLayerInfoBounds, -240). The design is
  * docs/design/compositing.md.
@@ -13,9 +13,9 @@
  *
  * ComposeLayerInfo switches a Layer_Info with no layers yet to the
  * composited mode (LAYERS_COMPOSE_ON), for layers on the bitmap bm. It
- * answers TRUE when it is composited: bm is an OpenRTG bitmap of 16 or 32
- * bits, opengpu.library's back end (not the CPU) does COMPOSITE fully for
- * its format (RGB565, or stream v1.3's XRGB32), and ENV:OpenPrefs/Windows
+ * answers TRUE when it is composited: bm is a GFOpenRTG bitmap of 16 or 32
+ * bits, gfopengpu.library's back end (not the CPU) does COMPOSITE fully for
+ * its format (RGB565, or stream v1.3's XRGB32), and ENV:GFOpenPrefs/Windows
  * does not say "composite off". Intuition asks it for public screens only.
  * Without LAYERS_COMPOSE_ON it puts a composited Layer_Info back to
  * classic layers. SetLayerInfoBounds on a composited Layer_Info composes
@@ -24,7 +24,7 @@
  * 47.102: ComposeLayerInfo(li, NULL, LAYERS_COMPOSE_WHY) changes nothing and
  * answers why li is not composited: LAYERS_WHY_COMPOSITED (0) while it is,
  * otherwise one of the LAYERS_WHY_ reasons below. A program asks it of a
- * screen's &Screen->LayerInfo (OpenPrefs' Windows page does, for the
+ * screen's &Screen->LayerInfo (GFOpenPrefs' Windows page does, for the
  * Workbench). 47.101 would take the call as "back to classic layers", so
  * ask only when lib_Revision >= 102.
  *
@@ -63,13 +63,13 @@
 /* Why a Layer_Info is classic (LAYERS_COMPOSE_WHY's answers). */
 #define LAYERS_WHY_COMPOSITED   0       /* it is composited */
 #define LAYERS_WHY_NOT_ASKED    1       /* never switched on: a custom screen (Intuition asks for public ones only) */
-#define LAYERS_WHY_SWITCHED_OFF 2       /* "composite off" in ENV:OpenPrefs/Windows when it was asked, or put back */
-#define LAYERS_WHY_NOT_RTG      3       /* not an OpenRTG bitmap: the native chipset (AGA), or a board OpenRTG
+#define LAYERS_WHY_SWITCHED_OFF 2       /* "composite off" in ENV:GFOpenPrefs/Windows when it was asked, or put back */
+#define LAYERS_WHY_NOT_RTG      3       /* not a GFOpenRTG bitmap: the native chipset (AGA), or a board GFOpenRTG
                                          * doesn't drive */
 #define LAYERS_WHY_8BIT         4       /* an 8-bit (CLUT) screen */
-#define LAYERS_WHY_LAYOUT       5       /* a pixel layout OpenGPU's driver doesn't composite fully */
-#define LAYERS_WHY_CPU_ONLY     6       /* OpenGPU has no driver, only its CPU back end */
-#define LAYERS_WHY_NO_OPENGPU   7       /* opengpu.library or openrtg.library would not open */
+#define LAYERS_WHY_LAYOUT       5       /* a pixel layout GFOpenGPU's driver doesn't composite fully */
+#define LAYERS_WHY_CPU_ONLY     6       /* GFOpenGPU has no driver, only its CPU back end */
+#define LAYERS_WHY_NO_OPENGPU   7       /* gfopengpu.library or gfopenrtg.library would not open */
 #define LAYERS_WHY_NO_MEMORY    8       /* a layer's surface could not be had: it went back to classic layers */
 
 #define LAYERLOOK_OPACITY       0UL     /* 0-255 */

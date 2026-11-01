@@ -1,5 +1,5 @@
 #!/bin/sh
-# OpenGfx and OpenLayers: the 16- and 8-bit arguments.
+# GFOpenGfx and GFOpenLayers: the 16- and 8-bit arguments.
 #  1. narrow_args.txt lists every argument NDK 3.2's graphics_lib.sfd and
 #     layers_lib.sfd give as WORD, UWORD, BYTE, UBYTE or BOOL, with its
 #     register; check_narrow.py checks that each LVO entry takes it narrow or

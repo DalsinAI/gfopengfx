@@ -1,10 +1,10 @@
 /* SPDX-License-Identifier: MIT */
-/* GelsABITest: OpenGfx graphics.library's gels and blitter calls
+/* GelsABITest: GFOpenGfx graphics.library's gels and blitter calls
  * (library/gels) side by side with OS 3.2's graphics.library. Copyright
  * (c) 2026 AmigaChrome Team. MIT.
  *
  * One script of calls is run through OS 3.2's graphics.library and then
- * through opengfx.library (OpenGfx's graphics.library under its own name),
+ * through gfopengfx.library (GFOpenGfx's graphics.library under its own name),
  * each writing its answers as lines; the lines are compared and each one
  * that differs is printed with both answers. The script is the corners
  * the autodocs leave open, each marked "ABI test" in library/gels:
@@ -629,7 +629,7 @@ int main(int argc, char **argv)
     if (!(os_base = (struct GfxBase *)OpenLibrary("graphics.library", 39))) { printf("no graphics.library\n"); rc = 20; goto done; }
     if (!probe) {
         strcpy(path, dir ? dir : "LIBS:");
-        AddPart(path, "opengfx.library", sizeof path);
+        AddPart(path, "gfopengfx.library", sizeof path);
         if (!(our_base = (struct GfxBase *)OpenLibrary(path, 47))) { printf("no %s\n", path); rc = 20; goto done; }
     }
     printf("OS: %s", (char *)os_base->LibNode.lib_IdString);

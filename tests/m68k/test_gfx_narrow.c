@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: MIT */
-/* OpenGfx: the face's LVOs (library/graphics/face_lvo.c) read only the low
+/* GFOpenGfx: the face's LVOs (library/graphics/face_lvo.c) read only the low
  * word or byte of the arguments NDK 3.2's graphics_lib.sfd gives as WORD,
  * UWORD, BYTE, UBYTE or BOOL. A caller built with NDK 3.2's inlines sets only
- * d0.w for a WORD (measured: OpenIntuition's WhichLayer call left d0's upper
+ * d0.w for a WORD (measured: GFOpenIntuition's WhichLayer call left d0's upper
  * word as it was), so the upper part is whatever the register held. Each call
  * here is made twice, on two equal rasters: once with clean arguments, once
  * with garbage in the upper parts; the rasters and the answers must match.

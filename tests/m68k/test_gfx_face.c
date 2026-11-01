@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT */
-/* OpenGfx graphics.library's face (library/graphics/gfx_face.cpp) over a
+/* GFOpenGfx graphics.library's face (library/graphics/gfx_face.cpp) over a
  * test env: memory from an arena that checks every free's size, semaphores
  * that count, hooks called as C. Random calls; each prints a line of what
  * it was given and what it answered or drew, and test_gfx_face.sh's python
@@ -746,7 +746,7 @@ static void t_regions(void)
     }
 }
 
-/* A card's bitmap (as OpenRTG's): GetBitMapAttr's vector answers
+/* A card's bitmap (as GFOpenRTG's): GetBitMapAttr's vector answers
  * BMA_FLAGS without BMF_STANDARD, and the face draws it with RectFill's
  * vector. Here the "card" is a planar bitmap the test marks, and the
  * vector draws through the RastPort's DrawMode, Mask and pens pixel by

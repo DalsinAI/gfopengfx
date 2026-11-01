@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT */
-/* OpenGfx's regions: graphics.library's NewRegion, DisposeRegion,
+/* GFOpenGfx's regions: graphics.library's NewRegion, DisposeRegion,
  * ClearRegion and the And/Or/Xor/Clear Rect and Region calls, in plain C.
  * Copyright (c) 2026 AmigaChrome Team. MIT.
  *

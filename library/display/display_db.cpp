@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT */
-/* OpenGfx display: extended nodes, monitors, the display database,
+/* GFOpenGfx display: extended nodes, monitors, the display database,
  * VideoControl, and the display's start. Copyright (c) 2026 AmigaChrome
  * Team. MIT.
  *

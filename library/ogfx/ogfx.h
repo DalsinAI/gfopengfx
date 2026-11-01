@@ -1,10 +1,10 @@
 /* Copyright (c) 2026 AmigaChrome Team. OpenRTG, MIT licence (LICENSE).
  * SPDX-License-Identifier: MIT
  *
- * OpenGfx inside opengpu.library: what opengpu_lib.c sees of it.
+ * GFOpenGfx inside gfopengpu.library: what opengpu_lib.c sees of it.
  *
- * Everything OpenGfx keeps lives in struct ogfx_state, which sits in
- * opengpu.library's base: the library has no writable globals, so the same
+ * Everything GFOpenGfx keeps lives in struct ogfx_state, which sits in
+ * gfopengpu.library's base: the library has no writable globals, so the same
  * build runs from LIBS: or from ROM (one-library layout, section 6). The
  * patches reach their state through a small entry each, also in the base
  * (struct ogfx_state's tramp[]): graphics.library calls a patch with its own
@@ -16,11 +16,11 @@
 #include <exec/execbase.h>
 #include <exec/libraries.h>
 #include <graphics/gfxbase.h>
-#include "../../include/opengpu/gfx.h"
+#include "../../include/gfopengpu/gfx.h"
 
 #define OGFX_REG(r, decl) register decl __asm(#r)
 
-/* graphics.library's calls OpenGfx owns, in this order everywhere: 1.1's
+/* graphics.library's calls GFOpenGfx owns, in this order everywhere: 1.1's
  * eight, then the fourteen of 0.8 (gfx.h). */
 enum {
     OGFX_P_TEXT, OGFX_P_TEXTLENGTH, OGFX_P_TEXTEXTENT, OGFX_P_TEXTFIT,
@@ -39,12 +39,12 @@ struct ogfx_state {
     UBYTE patched;
     UBYTE enabled;
     UBYTE have_provider;
-    UBYTE amigachrome;                 /* AmigaChrome Team boards: the leaves run as host code */
+    UBYTE amigachrome;                 /* AmiCradle Team boards: the leaves run as host code */
     struct OGFXProviderAll provider;   /* a v1 provider's calls are provider.v1's */
     APTR old[OGFX_P_COUNT];            /* graphics.library's vectors before the patches */
     UWORD tramp[OGFX_P_COUNT][OGFX_TRAMP_WORDS]; /* each patch's entry, written by InstallPatches */
     /* 0.7: the look (gfx.h). Kept after the entries, so old[] stays just
-     * before them as in 0.6 (OpenGadTools' GfxPatches test reads it there
+     * before them as in 0.6 (GFOpenGadTools' GfxPatches test reads it there
      * to follow a vector's chain). */
     volatile UBYTE have_look;
     UBYTE pad_look;
@@ -52,7 +52,7 @@ struct ogfx_state {
     struct OGFXLookV1 look;            /* kept when taken out, for calls still inside it */
 };
 
-/* Where the state sits in opengpu.library's base (opengpu_lib.c). */
+/* Where the state sits in gfopengpu.library's base (opengpu_lib.c). */
 extern const ULONG ogpu_ogfx_at;
 
 void ogfx_init(struct ogfx_state *st, struct ExecBase *sys);
@@ -61,7 +61,7 @@ void ogfx_init(struct ogfx_state *st, struct ExecBase *sys);
 int ogfx_may_expunge(struct ogfx_state *st);
 void ogfx_expunge(struct ogfx_state *st);
 
-/* The LVOs (A6 is opengpu.library's base). */
+/* The LVOs (A6 is gfopengpu.library's base). */
 ULONG OGFX_Version(OGFX_REG(a6, struct Library *base));
 LONG OGFX_InstallPatches(OGFX_REG(a6, struct Library *base));
 LONG OGFX_SetEnabled(OGFX_REG(d0, ULONG enabled), OGFX_REG(a6, struct Library *base));

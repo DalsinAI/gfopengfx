@@ -1,5 +1,5 @@
 #!/bin/sh
-# OpenLayers' library code (library/layers/layers_lib.c) with the core,
+# GFOpenLayers' library code (library/layers/layers_lib.c) with the core,
 # built against tests/host-ndk and a pixel model of exec and
 # graphics.library (tests/m68k/test_layers_lib.c), for the 68040
 # at -O0 and -O2 under qemu-m68k, where the structures have the

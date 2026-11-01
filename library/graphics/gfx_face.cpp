@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// OpenGfx graphics.library, the face: bitmaps, RastPort state, colour maps
+// GFOpenGfx graphics.library, the face: bitmaps, RastPort state, colour maps
 // and pens, regions, layer locks, super bitmaps, scaling, Flood and the
 // drawing calls around the core. Copyright (c) 2026 AmigaChrome Team. MIT.
 //
@@ -110,7 +110,7 @@ void planar_of(const gfx_bitmap *b, gfx_planar *p)
 // A bitmap the core does not draw: more than 8 planes, or one a card's
 // driver made, which GetBitMapAttr (through the vector the driver patches)
 // answers BMA_FLAGS for without BMF_STANDARD. Such a bitmap is drawn with
-// the library's own RectFill vector (gfx_env.h). On OS 3.2.3 with OpenRTG,
+// the library's own RectFill vector (gfx_env.h). On OS 3.2.3 with GFOpenRTG,
 // DrawEllipse and EraseRect draw on its screens as on planar ones
 // (tests/DrawProbe.c, truecolour screen and window, 15 Oct 2026).
 bool foreign(gfx_env *e, gfx_bitmap *bm)
@@ -213,9 +213,9 @@ bool near_enough(uint32_t d, int32_t precision)
 
 // A pen's colour, set by ObtainPen or ObtainBestPenA: on a ViewPort's map,
 // through SetRGB32's vector when the library has one, so a card's driver
-// that patched SetRGB32 shows the colour too (OpenRTG keeps its board's
-// palette that way; without it, the pens icons and OpenMeters obtained
-// were black on an OpenRTG screen).
+// that patched SetRGB32 shows the colour too (GFOpenRTG keeps its board's
+// palette that way; without it, the pens icons and GFOpenMeters obtained
+// were black on a GFOpenRTG screen).
 void pen_set_color(gfx_env *e, gfx_colormap *cm, uint32_t n, uint32_t r, uint32_t g, uint32_t b)
 {
     void *vp = cm->palextra ? cm->palextra->viewport : nullptr;
@@ -247,7 +247,7 @@ int32_t pen_take_free(gfx_colormap *cm)
 // 256th ReleasePen and handed to the next colour asked for (SatProbe, W33).
 // On the 24-bit Workbench of lab t5-icon24 (W33) pens 0 and 1, which
 // Intuition obtains for the DrawInfo, were found free while in use, and
-// OpenBench's labels and the look-B icons' dark pixels were drawn yellow.
+// GFOpenBench's labels and the look-B icons' dark pixels were drawn yellow.
 // icon.library takes a reference for each palette colour of each icon
 // laid out: with this change, after the same boot, pens 1, 233, 248 and
 // 251 had 255 holders or more (PenProbe, W33). OS 3.2.3's
@@ -524,10 +524,10 @@ void backfill(gfx_env *e, gfx_rastport *rp, int32_t x0, int32_t y0, int32_t x1, 
         // Measured on OS 3.2.3 (tests/DrawProbe.c EraseRect, 15 Oct 2026):
         // with the default backfill, EraseRect in a smart refresh window
         // leaves the part another window covers as it was, on an AGA
-        // screen and on OpenRTG ones alike; it clears what shows. A
-        // composited layer's piece (OpenLayers) is obscured but shows:
+        // screen and on GFOpenRTG ones alike; it clears what shows. A
+        // composited layer's piece (GFOpenLayers) is obscured but shows:
         // nothing covers it (lab t5-font, W49: EraseRect cleared none of a
-        // window on the composited Workbench, and OpenPrefs's pages were
+        // window on the composited Workbench, and GFOpenPrefs's pages were
         // drawn over each other).
         if (!hook && cr->lobs && !covered && !(cr->flags & GFX_CR_COMPOSED)) continue;
         if (!hook && foreign(e, bm)) {
@@ -1375,7 +1375,7 @@ void gfx_DrawEllipse(gfx_env *e, gfx_rastport *rp, int32_t xc, int32_t yc, int32
     if (!(l && (l->flags & GFX_LAYERSUPER) && l->superbitmap) && foreign(e, rp->bitmap)) {
         // a card's bitmap (foreign): each run through the RectFill vector,
         // which takes the layer and the DrawMode itself. Measured on OS
-        // 3.2.3 with OpenRTG: DrawEllipse draws on its screens and windows
+        // 3.2.3 with GFOpenRTG: DrawEllipse draws on its screens and windows
         // in JAM1, JAM2 and COMPLEMENT, and these fills give the same
         // pixels (tests/DrawProbe.c, truecolour lines)
         gfx_hook_wait_blit(e);

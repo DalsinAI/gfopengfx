@@ -1,4 +1,4 @@
-The letters of OpenGfx's ROM fonts topaz.font 8 and topaz.font 9
+The letters of GFOpenGfx's ROM fonts topaz.font 8 and topaz.font 9
 (romfont8.txt, romfont9.txt, topaz_data.cpp) are drawn from DejaVu Sans Mono
 (https://dejavu-fonts.github.io/) and finished by hand. DejaVu is derived
 from Bitstream Vera; DejaVu's own changes are in the public domain. The

@@ -1,5 +1,5 @@
 #!/bin/sh
-# OpenGfx text (library/text): the lean C++ core, built with an m68k cross
+# GFOpenGfx text (library/text): the lean C++ core, built with an m68k cross
 # GCC for the 68040 at -O0 and -O2, each run on that CPU
 # under qemu-m68k against a python3 model made at test time
 # (test_gfx_text_model.py: random fonts, colour, proportional, kerned and

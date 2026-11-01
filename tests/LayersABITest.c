@@ -1,8 +1,8 @@
-/* LayersABITest: OS 3.2's layers.library and OpenLayers side by side.
+/* LayersABITest: OS 3.2's layers.library and GFOpenLayers side by side.
  * Copyright (c) 2026 AmigaChrome Team. MIT.
  *
  * Runs one script of calls through a layers.library base and writes what
- * comes of each as lines of text. With openlayers.library in the directory
+ * comes of each as lines of text. With gfopenlayers.library in the directory
  * given with LIB= it runs the script through OS 3.2's library and then
  * through ours, each on a fresh bitmap with the same pixels, and prints
  * each line that differs, both answers. With PROBE it prints OS 3.2's
@@ -552,7 +552,7 @@ int main(int argc, char **argv)
     if (!(os_base = OpenLibrary("layers.library", 39))) { printf("no layers.library\n"); rc = 20; goto done; }
     if (dir && !probe) {
         strcpy(path, dir);
-        AddPart(path, "openlayers.library", sizeof path);
+        AddPart(path, "gfopenlayers.library", sizeof path);
         if (!(our_base = OpenLibrary(path, 47))) { printf("no %s\n", path); rc = 20; goto done; }
     }
     printf("OS: %s", (char *)os_base->lib_IdString);

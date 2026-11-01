@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT */
-/* OpenGfx's core: graphics.library's drawing on a bitmap's own memory, in
+/* GFOpenGfx's core: graphics.library's drawing on a bitmap's own memory, in
  * plain C, planar (OCS/ECS/AGA) and chunky (RTG). Copyright (c) 2026
  * AmigaChrome Team. MIT.
  *
@@ -9,8 +9,8 @@
  * bitmap and calls these. Every coordinate here is already inside the
  * bitmap; x1 >= x0 and y1 >= y0.
  *
- * Runs on a real 68000 and up with no FPU and no OpenGPU; on AmigaChrome
- * the same calls can become AC090 leaves (ogfx_leaves.h) or OpenGPU work,
+ * Runs on a real 68000 and up with no FPU and no GFOpenGPU; on AmiCradle
+ * the same calls can become AC090 leaves (ogfx_leaves.h) or GFOpenGPU work,
  * giving the same bytes. Every call is pure: it touches only the bitmap
  * memory it is given, so any core may run it (plan section 5). */
 #ifndef OPENGFX_CORE_H

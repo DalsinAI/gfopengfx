@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT */
-/* OpenGfx: an open graphics.library for AmigaOS 3.2, API and ABI
+/* GFOpenGfx: an open graphics.library for AmigaOS 3.2, API and ABI
  * compatible. Copyright (c) 2026 AmigaChrome Team. MIT.
  *
  * Clean-room: written from graphics.library's autodocs, the NDK 3.2
@@ -12,7 +12,7 @@
  * gfx_vectors.h (made by gen_stubs.py from graphics.lvo) lists.
  *
  * LIBNAME is "graphics.library" for the replacement and
- * "opengfx.library" for the side-by-side build the ABI tests open next to
+ * "gfopengfx.library" for the side-by-side build the ABI tests open next to
  * OS 3.2's own. graphics.library is in ROM, so the replacement goes in at
  * boot as a resident module, never from LIBS:. */
 #include <exec/types.h>
@@ -39,16 +39,16 @@
 #define LIBNAME "graphics.library"
 #endif
 #define LIB_VERSION  47
-#define LIB_REVISION 100                /* 47.100 and up: OpenGfx */
+#define LIB_REVISION 100                /* 47.100 and up: GFOpenGfx */
 
 /* Run as a program, the library does nothing. This must stay the first code
  * in the file (-fno-toplevel-reorder). */
 int start(void) { return -1; }
 
 static const char lib_name[] = LIBNAME;
-static const char lib_id[] = "graphics.library 47.100 (13.10.2026) OpenGfx, AmigaChrome Team\r\n";
+static const char lib_id[] = "graphics.library 47.100 (13.10.2026) GFOpenGfx, AmiCradle Team\r\n";
 static const char lib_ver[] __attribute__((used)) =
-    "\0$VER: graphics.library 47.100 (13.10.2026) OpenGfx, AmigaChrome Team";
+    "\0$VER: graphics.library 47.100 (13.10.2026) GFOpenGfx, AmiCradle Team";
 static const char util_name[] = "utility.library";
 
 /* ---- the env: ctx is the library base -------------------------------- */

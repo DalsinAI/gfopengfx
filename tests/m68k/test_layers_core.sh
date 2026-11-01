@@ -1,5 +1,5 @@
 #!/bin/sh
-# OpenLayers' core (library/layers/layers_core.c) built with an m68k cross
+# GFOpenLayers' core (library/layers/layers_core.c) built with an m68k cross
 # GCC for the 68040 at -O0 and -O2, each run on that CPU
 # under qemu-m68k, against a plain model: a grid of pixels. Random
 # rectangle sets, random stacks of layers (some hidden, some off the

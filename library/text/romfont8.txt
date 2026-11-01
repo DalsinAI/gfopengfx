@@ -1,8 +1,8 @@
-# OpenKick's ROM screen font, 8 pixels high: topaz.font 8 (8 x 8 cells,
+# GFOpenKick's ROM screen font, 8 pixels high: topaz.font 8 (8 x 8 cells,
 # baseline row 6, one descender row), the name old programs open. The letters
 # are DejaVu Sans Mono's (see DEJAVU-LICENCE.txt): drawn at 10 pixels with the
 # font's own hinting, one bit deep, then finished by hand, glyph by glyph, in
-# this file for OpenGfx (24 October 2026). It replaces the Team's earlier
+# this file for GFOpenGfx (24 October 2026). It replaces the Team's earlier
 # two-pixel-stem drawing; nothing in it comes from Commodore's or AROS's topaz.
 #
 # The design: one-pixel strokes only (no doubled uprights); ink in columns 1-6

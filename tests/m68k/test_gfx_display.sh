@@ -1,5 +1,5 @@
 #!/bin/sh
-# OpenGfx graphics.library's display (library/display) under qemu-m68k:
+# GFOpenGfx graphics.library's display (library/display) under qemu-m68k:
 # the lean C++ core built with an m68k cross GCC for the 68040
 # at -O0 and -O2, each run on that CPU by test_gfx_display.cpp on a
 # simulated machine (exec's memory, the custom chips' registers, a copper

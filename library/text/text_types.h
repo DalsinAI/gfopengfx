@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// OpenGfx text: the NDK 3.2 structures the text calls touch, with their
+// GFOpenGfx text: the NDK 3.2 structures the text calls touch, with their
 // published names, laid out for the m68k (big-endian, 32-bit pointers,
 // 2-byte alignment) and checked by static_asserts. Copyright (c) 2026
 // AmigaChrome Team. MIT.

@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT */
-/* OpenGfx gels: graphics.library's GELs (VSprites, Bobs, AnimObs), their
+/* GFOpenGfx gels: graphics.library's GELs (VSprites, Bobs, AnimObs), their
  * collisions, and the blitter: its queue (QBlit, QBSBlit), its ownership
  * (OwnBlitter, DisownBlitter, WaitBlit) and the blits drawn through it
  * (BltClear, BltTemplate, BltMaskBitMapRastPort). Copyright (c) 2026
@@ -155,7 +155,7 @@ struct gels_state {
      * the tests give C functions) */
     int32_t (*call_blit)(struct gels_state *st, struct gl_bltnode *bn);  /* bn->function: A0 custom, A1 bn */
     void (*call_cleanup)(struct gels_state *st, struct gl_bltnode *bn); /* bn->cleanup: A0 custom, A1 bn */
-    /* the side-by-side opengfx.library: OS 3.2's graphics.library keeps
+    /* the side-by-side gfopengfx.library: OS 3.2's graphics.library keeps
      * the blitter, so OwnBlitter, DisownBlitter, WaitBlit, QBlit and
      * QBSBlit are its (lvo GELS_SYS_*, bn the node for QBlit and QBSBlit),
      * and every blit of ours is the CPU's, made while we own its blitter

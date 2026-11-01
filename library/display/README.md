@@ -1,6 +1,6 @@
-# OpenGfx graphics.library: the display
+# GFOpenGfx graphics.library: the display
 
-This directory is the display area of OpenGfx's `graphics.library` (see `library/graphics/README.md` for the face and `OWNERS.md` for who owns what). It is clean-room work from the NDK 3.2 headers, the autodocs, the Hardware Reference Manual and OS 3.2's measured behaviour. It covers 43 LVOs:
+This directory is the display area of GFOpenGfx's `graphics.library` (see `library/graphics/README.md` for the face and `OWNERS.md` for who owns what). It is clean-room work from the NDK 3.2 headers, the autodocs, the Hardware Reference Manual and OS 3.2's measured behaviour. It covers 43 LVOs:
 
 - Views and ViewPorts: InitView, InitVPort, MakeVPort, MrgCop, LoadView, FreeVPortCopLists, FreeCopList, FreeCprList, ScrollVPort, ChangeVPBitMap, AllocDBufInfo, FreeDBufInfo and CalcIVG.
 - User copper lists: UCopperListInit, CWait, CMove and CBump. CINIT, CWAIT, CMOVE and CEND are the NDK macros over these.
@@ -21,7 +21,7 @@ This directory is the display area of OpenGfx's `graphics.library` (see `library
 | `graphics.sources` | The files that `library/graphics/build-amiga.sh` builds into the library. |
 | `build-amiga.sh` | Builds `DisplayABITest` with the os32-gcc16 stove. |
 | `tests/m68k/test_gfx_display.sh` | The qemu test (below). |
-| `tests/DisplayABITest.c` | One script run through OS 3.2's graphics.library and then through opengfx.library, compared line by line. `PROBE` prints OS 3.2's answers only. |
+| `tests/DisplayABITest.c` | One script run through OS 3.2's graphics.library and then through gfopengfx.library, compared line by line. `PROBE` prints OS 3.2's answers only. |
 
 ## How a ViewPort becomes copper
 
@@ -99,7 +99,7 @@ The horizontal position follows the HRM:
 | WaitBOVP while the beam wraps into the next frame | Returns | ours |
 | GfxBase's NormalDisplayRows, MicrosPerLine and similar fields | OS 3.2's values | ABI test (GFXBASE) |
 | GfxBase's LastChanceMemory, ActiViewCprSemaphore, MonitorListSemaphore and HashTableSemaphore | Each points at a SignalSemaphore of its own, initialised in the display's state. A monitor driver run by LoadMonDrvs takes MonitorListSemaphore; when it was NULL, ObtainSemaphore read low memory as a semaphore owned by another task and the driver waited for ever | NDK `graphics/gfxbase.h` (the fields); test |
-| opengfx.library opened next to OS 3.2 | Every call works, but no custom chip register is written (`gd_init`'s `own_hw`) | ours; test |
+| gfopengfx.library opened next to OS 3.2 | Every call works, but no custom chip register is written (`gd_init`'s `own_hw`) | ours; test |
 
 ## The tests
 
@@ -132,7 +132,7 @@ Result (m68k-linux-gnu-g++ 13.3.0, qemu-m68k 8.2.2, seed 20261013, 120 scenes, 2
 
 `tests/ScreenDepthProbe.c` runs on an Amiga with any ROM. It prints the MaxDepth of lores, hires and super hires, whether SysInfo 4.4's screen and its neighbours open, and a table of every resolution and depth from 1 to 8, plain and laced. With MODES and DEPTH it holds one screen on show, with a bar for each colour, for a screenshot. `library/display/build-amiga.sh` builds it.
 
-`DisplayABITest` has not yet been run on OS 3.2. It needs the stove and a boot with DEVS:Monitors empty, because OpenGfx has only the built-in PAL and NTSC monitors.
+`DisplayABITest` has not yet been run on OS 3.2. It needs the stove and a boot with DEVS:Monitors empty, because GFOpenGfx has only the built-in PAL and NTSC monitors.
 
 ## Not yet
 

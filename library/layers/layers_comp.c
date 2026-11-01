@@ -7,9 +7,9 @@
  *
  * On a composited Layer_Info (ComposeLayerInfo) every layer draws into a
  * surface of its own: a bitmap made with the screen's bitmap as its friend,
- * so OpenRTG makes it in its format, whose memory ORTG_BitMapInfo gives.
+ * so GFOpenRTG makes it in its format, whose memory ORTG_BitMapInfo gives.
  * The layer has one ClipRect, obscured, whose BitMap is the surface, so
- * graphics.library and OpenRTG draw there as into a smart refresh layer's
+ * graphics.library and GFOpenRTG draw there as into a smart refresh layer's
  * backing bitmap: at x - (MinX & ~15). A layer's pixels therefore start at
  * x (MinX & 15) in its surface, and move in it when a move changes that.
  *
@@ -18,20 +18,20 @@
  * drawn into a layer is marked (oc_mark, on the drawing calls' vectors)
  * and composed by the compositor task once the drawing has paused for
  * OC_SETTLE (oc_settle), not at the next vertical blank. A
- * compose is one OpenGPU batch with one fence: what no layer covers gets
+ * compose is one GFOpenGPU batch with one fence: what no layer covers gets
  * the Layer_Info's backfill, then each shown layer, back to front, its
  * shadow under it, is copied (opaque) or composited (with its opacity, or
  * its own alpha for an ARGB32 surface). Layers that are opaque hide what
  * is behind them, so nothing hidden is drawn. 47.105 (the compositor's
  * step 4): the batch is not waited for. It names only bitmaps (the screen,
  * the surfaces, the pieces of clip regions) and the shadow's picture;
- * OpenRTG waits for it before the CPU draws on or frees a bitmap, and
+ * GFOpenRTG waits for it before the CPU draws on or frees a bitmap, and
  * layers before it frees the shadow's picture (oc_idle).
  *
  * 47.106 (decision D7(b)): a program that writes the screen's bitmap by
  * address (its window's RastPort's bitmap is the screen's) writes past
  * the compositor, which would draw over it from the window's surface.
- * OpenRTG 0.23's ORTG_WrittenSpans tells exactly what the CPU itself
+ * GFOpenRTG 0.23's ORTG_WrittenSpans tells exactly what the CPU itself
  * wrote there (the runtime's watch, acrtg-v9); those pixels are copied
  * into the surface of the front layer there before anything composes
  * over them, and composed again (oc_pull). Before every drawing call into
@@ -48,8 +48,8 @@
 #include <dos/dos.h>
 #include <dos/dosextens.h>
 #include <graphics/gfxbase.h>
-#include <graphics/openlayers.h>
-/* the public OpenGPU and OpenRTG headers and their inline calls (not
+#include <graphics/gfopenlayers.h>
+/* the public GFOpenGPU and GFOpenRTG headers and their inline calls (not
  * proto/opengpu.h: opengpu/module.h has a field named SysBase, which
  * ol_sysbase.h makes a macro) */
 #include <opengpu/opengpu.h>
@@ -68,7 +68,7 @@
 #endif
 
 enum { S_SCREEN, S_SURF, S_SHADOW, S_SUB };     /* the batch's slots */
-/* the look's settings, as ENV:OpenPrefs/Windows' lines (oc_prefs' keys):
+/* the look's settings, as ENV:GFOpenPrefs/Windows' lines (oc_prefs' keys):
  * composite on|off; shadows on|off; the shadow's reach R in pixels; and,
  * as 0-255, its darkest and a dragged and an inactive window's opacity */
 enum { SET_ON, SET_SHADOWS, SET_SIZE, SET_STRENGTH, SET_DRAG, SET_INACTIVE };
@@ -102,7 +102,7 @@ struct OComp {
     UBYTE fmt, depth;           /* OGPU format of the screen and the surfaces; 16 or 32 */
     UBYTE set[6];               /* the prefs (oc_prefs): SET_ */
     UBYTE full;                 /* the compositor composes all of it next */
-    UBYTE pull;                 /* 47.106: OpenRTG has ORTG_WrittenSpans (0.23) */
+    UBYTE pull;                 /* 47.106: GFOpenRTG has ORTG_WrittenSpans (0.23) */
     ULONG *shadow;              /* ARGB32, (4R + 1) square: the shadow's corners and edges */
     volatile ULONG *flag;       /* 47.106: the board's long, not 0 while it has something written; 0: no watch */
 };
@@ -139,7 +139,7 @@ struct oc_batch {
 #include "layers_mark.h"
 
 /* The calls marked: graphics.library's drawing calls (0), CyberGraphX's
- * (1) and OpenRTG's (2) that draw into a RastPort. */
+ * (1) and GFOpenRTG's (2) that draw into a RastPort. */
 struct opatch {
     UBYTE lib, mark;
     WORD lvo;
@@ -276,7 +276,7 @@ static void put32(UWORD *w, ULONG v)
 }
 
 /* Our thunk on each call, on top of whatever is there. A patch put on top
- * of ours later (OpenGfx's, when OpenRTG hands its drawing to it after
+ * of ours later (GFOpenGfx's, when GFOpenRTG hands its drawing to it after
  * boot) may draw without calling ours; then a new thunk goes on top of it.
  * Thunks are never taken out: others may have called on to them. */
 static void oc_patch_all(struct OCB *cb)
@@ -554,7 +554,7 @@ static void oc_build(struct OCB *cb, const struct OComp *c, struct oc_batch *b, 
 
 /* ---- what programs write into the screen by address (47.106) ------------ */
 
-/* OpenRTG 0.23's ORTG_WrittenSpans (openrtg.h's struct OpenRTGSpan: a row,
+/* GFOpenRTG 0.23's ORTG_WrittenSpans (openrtg.h's struct OpenRTGSpan: a row,
  * its pixels x0 to x1), here so layers builds with an older openrtg.h */
 struct oc_span {
     UWORD y, x0, x1;
@@ -849,7 +849,7 @@ static void oc_run(struct OCB *cb)
     for (c = cb->comps; c; c = c->next) {
         int r = 0;
         lc_clear(&a);
-        /* 47.106: the watch on this screen when the board can (OpenRTG moves
+        /* 47.106: the watch on this screen when the board can (GFOpenRTG moves
          * it to the screen shown), then what programs wrote into it, into the
          * windows, marked to be composed now */
         if (c->pull) c->flag = (volatile ULONG *)oc_written_spans(c->screen, 0, 0);
@@ -926,7 +926,7 @@ static void oc_task(void)
 
 /* ---- a composited Layer_Info's changes --------------------------------- */
 
-/* OpenRTG 0.20's AllocBitMap tag (openrtg.h): a displayable friend only
+/* GFOpenRTG 0.20's AllocBitMap tag (openrtg.h): a displayable friend only
  * drawing commands read, for video RAM's card part. */
 #ifndef ORTG_BMA_CARD
 #define ORTG_BMA_CARD 0x804F5201UL
@@ -934,13 +934,13 @@ static void oc_task(void)
 
 /* A surface for a layer w x h: room for MinX & 15 more, and some to grow
  * into, so sizing a window does not make a new one at every step.
- * 47.103: asked for as displayable, so OpenRTG (0.19 and up) puts it in the
+ * 47.103: asked for as displayable, so GFOpenRTG (0.19 and up) puts it in the
  * screen's board's video RAM while displayable friends take at most half of
  * it, and in fast RAM after that. In video RAM the GPU reaches it: drawing in
- * it and composing from it need no copy into OpenGPU's upload arena.
+ * it and composing from it need no copy into GFOpenGPU's upload arena.
  * 47.104: also with ORTG_BMA_CARD, as only drawing commands read a surface
- * (layers never hands one to a program, and composes from it with OpenGPU):
- * OpenRTG 0.20 puts it in the board's card part, the PC graphics card's own
+ * (layers never hands one to a program, and composes from it with GFOpenGPU):
+ * GFOpenRTG 0.20 puts it in the board's card part, the PC graphics card's own
  * memory, where there is one (acrtg-v7), and other graphics libraries ignore
  * the tag. */
 static int oc_surface(struct OCB *cb, struct OComp *c, LONG w, LONG h, struct OLayer *o)
@@ -990,7 +990,7 @@ static void oc_fill(struct ol_base *olb, struct Layer *l, const struct lc_rect *
         backfill(olb, l, l->BackFill, &p, r);
         /* The surface is not the screen, so the bounds are the surface's: a
          * hook that draws through the RastPort's layer, with the bounds less
-         * the layer's place on the screen (OpenLook 0.9's, given to asl.library's
+         * the layer's place on the screen (GFOpenLook 0.9's, given to asl.library's
          * windows and to every window opened without a hook), drew nothing there
          * and the window was black inside (lab t5-asl2, a copy of Instance-32).
          * It gets the area again with a bare RastPort, as
@@ -1028,7 +1028,7 @@ static void oc_demote(struct change *ch)
     ch->comp = 0;
 }
 
-/* 47.105: the composes left running are done (opengpu.library 0.20 waits
+/* 47.105: the composes left running are done (gfopengpu.library 0.20 waits
  * for an old fence as for the newest; batches finish in order). */
 static void oc_idle(struct OCB *cb)
 {
@@ -1217,8 +1217,8 @@ static const char *const keys[6] = { "composite", "shadows", "shadow.size", "sha
                                      "inactive.opacity" };
 static const UBYTE kinds[6] = { 0, 0, 1, 2, 2, 2 };
 
-/* ENV:OpenPrefs/Windows' lines for the composited mode (the rest are
- * OpenWindows'). A missing file or line keeps the default. Answers 0 when
+/* ENV:GFOpenPrefs/Windows' lines for the composited mode (the rest are
+ * GFOpenWindows'). A missing file or line keeps the default. Answers 0 when
  * "composite off". */
 static int oc_prefs(struct OComp *c)
 {
@@ -1235,7 +1235,7 @@ static int oc_prefs(struct OComp *c)
     if ((buf = AllocMem(4096, MEMF_PUBLIC))) {
         win = me->pr_WindowPtr;
         me->pr_WindowPtr = (APTR)-1;            /* no requester when ENV: isn't there yet */
-        if ((fh = Open((CONST_STRPTR)"ENV:OpenPrefs/Windows", MODE_OLDFILE))) {
+        if ((fh = Open((CONST_STRPTR)"ENV:GFOpenPrefs/Windows", MODE_OLDFILE))) {
             n = Read(fh, buf, 4095);
             Close(fh);
         }
@@ -1262,8 +1262,8 @@ static int oc_prefs(struct OComp *c)
     return c->set[SET_ON];
 }
 
-/* The composited mode's state, made once: opengpu.library and
- * openrtg.library (from ROM:), and the compositor task. */
+/* The composited mode's state, made once: gfopengpu.library and
+ * gfopenrtg.library (from ROM:), and the compositor task. */
 static struct OCB *oc_cb(struct ol_base *olb)
 {
     struct OCB *cb;
@@ -1297,8 +1297,8 @@ static struct OCB *oc_cb(struct ol_base *olb)
     return cb;
 }
 
-/* A new composited Layer_Info's state, when its bitmap is an OpenRTG one
- * of 16 or 32 bits, OpenGPU's back end (not the CPU) does COMPOSITE fully
+/* A new composited Layer_Info's state, when its bitmap is a GFOpenRTG one
+ * of 16 or 32 bits, GFOpenGPU's back end (not the CPU) does COMPOSITE fully
  * for it, and the prefs don't say "composite off". Otherwise 0, and why
  * in inf->why (LAYERS_WHY_). */
 static struct OComp *oc_new(struct OCB *cb, struct OInfo *inf, struct Layer_Info *li, struct BitMap *bm)
@@ -1308,7 +1308,7 @@ static struct OComp *oc_new(struct OCB *cb, struct OInfo *inf, struct Layer_Info
     ULONG q, fmt;
     inf->why = LAYERS_WHY_NOT_RTG;
     if (!ORTG_BitMapInfo(bm, &bi)) return 0;
-    /* OpenRTG's formats (openrtg.h): 0 CLUT8, 1 RGB565, 2 ARGB32 (its top byte 0: XRGB32) */
+    /* GFOpenRTG's formats (openrtg.h): 0 CLUT8, 1 RGB565, 2 ARGB32 (its top byte 0: XRGB32) */
     inf->why = bi.format ? LAYERS_WHY_LAYOUT : LAYERS_WHY_8BIT;
     if (bi.format != 1 && bi.format != 2) return 0;
     fmt = bi.format == 1 ? OGPU_FMT_RGB565 : OGPU_FMT_XRGB32;
@@ -1341,7 +1341,7 @@ static struct OComp *oc_new(struct OCB *cb, struct OInfo *inf, struct Layer_Info
     c->h = bi.height;
     c->fmt = (UBYTE)fmt;
     c->depth = bi.format == 1 ? 16 : 32;
-    /* 47.106: OpenRTG 0.23's ORTG_WrittenSpans; the board watches the
+    /* 47.106: GFOpenRTG 0.23's ORTG_WrittenSpans; the board watches the
      * screen's bitmap from now when it can (0: it can't, and nothing of
      * this runs) */
     c->pull = cb->ortg->lib_Version > 0 || cb->ortg->lib_Revision >= 23;
@@ -1376,8 +1376,8 @@ LONG ol_ComposeLayerInfo(struct ol_base *olb, struct Layer_Info *li, struct BitM
         return TRUE;
     }
     if (!(flags & LAYERS_COMPOSE_ON) || !bm || li->top_layer) return FALSE;
-    /* the first time only from a process: opengpu.library may come from
-     * ROM:, through DOS, and OpenGPU loads its driver for a process */
+    /* the first time only from a process: gfopengpu.library may come from
+     * ROM:, through DOS, and GFOpenGPU loads its driver for a process */
     inf->why = LAYERS_WHY_NO_OPENGPU;
     if (!olb->cb && FindTask(0)->tc_Node.ln_Type != NT_PROCESS) return FALSE;
     ObtainSemaphore(&olb->infolock);

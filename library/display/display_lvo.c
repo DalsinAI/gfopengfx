@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT */
-/* OpenGfx graphics.library: the display's LVOs in their registers, its
+/* GFOpenGfx graphics.library: the display's LVOs in their registers, its
  * init and exit, and the vertical blank server. Copyright (c) 2026 AmigaChrome
  * Team. MIT.
  *
@@ -13,7 +13,7 @@
 
 /* Arguments NDK 3.2's protos give as WORD, UWORD, BYTE, UBYTE or BOOL are
  * cast to that width where they are handed on: a caller built with those
- * inlines sets only the low part of the register (measured: OpenIntuition's
+ * inlines sets only the low part of the register (measured: GFOpenIntuition's
  * WhichLayer call left d0's upper word as it was). */
 #ifndef GFX_REG
 #define GFX_REG(r, decl) decl
@@ -46,7 +46,7 @@ static void gd_vb_entry(void) {}
 static const char gd_vb_name[] = "graphics.library vblank";
 
 /* The display is ours only as graphics.library; opened next to OS 3.2's
- * as opengfx.library it must leave the custom chips alone. */
+ * as gfopengfx.library it must leave the custom chips alone. */
 static int gd_is_system(const struct gfx_base *gb)
 {
     static const char want[] = "graphics.library";

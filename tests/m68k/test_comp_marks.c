@@ -1,7 +1,7 @@
-/* OpenLayers' composited mode: the marks (library/layers/layers_mark.h)
+/* GFOpenLayers' composited mode: the marks (library/layers/layers_mark.h)
  * against the drawing itself, under qemu-m68k, where the registers are
- * 32 bits as on the Amiga. For Draw, PolyDraw and DrawEllipse (OpenGfx's
- * core, library/core/gfx_rp.c) and ClearEOL and ClearScreen (OpenGfx's
+ * 32 bits as on the Amiga. For Draw, PolyDraw and DrawEllipse (GFOpenGfx's
+ * core, library/core/gfx_rp.c) and ClearEOL and ClearScreen (GFOpenGfx's
  * text, library/text/text_core.cpp), random calls are made as a thunk
  * makes them (ocm_pre, the call, ocm_bounds, with junk in the registers'
  * upper words), and every pixel the call changed must be inside the mark:

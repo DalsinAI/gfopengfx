@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT */
-/* OpenLayers: an open layers.library for AmigaOS 3.2, API and ABI
+/* GFOpenLayers: an open layers.library for AmigaOS 3.2, API and ABI
  * compatible. Copyright (c) 2026 AmigaChrome Team. MIT.
  *
  * Clean-room: written from layers.library's autodocs, the NDK 3.2 headers'
@@ -12,7 +12,7 @@
  * layers_lib.fd), and each call taking its arguments in the documented
  * registers.
  *
- * LIBNAME is "layers.library" for the replacement and "openlayers.library"
+ * LIBNAME is "layers.library" for the replacement and "gfopenlayers.library"
  * for the side-by-side build that tests/LayersABITest opens next to OS
  * 3.2's own. layers.library is in ROM, so the replacement goes in at boot
  * as a resident module (OpenModule, plan section 3), never from LIBS:. */
@@ -38,7 +38,7 @@
 #define LIBNAME "layers.library"
 #endif
 #define LIB_VERSION  47
-#define LIB_REVISION 108                /* 47.100 and up: OpenLayers; 47.101: the composited mode; 47.102: LAYERS_COMPOSE_WHY; 47.103: surfaces in video RAM; 47.104: surfaces in the card part; 47.105: composes not waited for; 47.106: what programs write into the screen goes into their windows; 47.107: LAYERLOOK_KEYED (the screen's see-through bar); 47.108: Draw, PolyDraw, DrawEllipse, ClearEOL, ClearScreen, WritePixelLine8 and ScalePixelArray compose only what they drew */
+#define LIB_REVISION 108                /* 47.100 and up: GFOpenLayers; 47.101: the composited mode; 47.102: LAYERS_COMPOSE_WHY; 47.103: surfaces in video RAM; 47.104: surfaces in the card part; 47.105: composes not waited for; 47.106: what programs write into the screen goes into their windows; 47.107: LAYERLOOK_KEYED (the screen's see-through bar); 47.108: Draw, PolyDraw, DrawEllipse, ClearEOL, ClearScreen, WritePixelLine8 and ScalePixelArray compose only what they drew */
 
 /* Everything the library keeps is here (or on the stack): no writable
  * globals, so it can run from ROM. Each call reaches it through A6. */
@@ -53,9 +53,9 @@ struct OLBase {
 int start(void) { return -1; }
 
 static const char lib_name[] = LIBNAME;
-static const char lib_id[] = "layers.library 47.108 (1.11.2026) OpenLayers, AmigaChrome Team\r\n";
+static const char lib_id[] = "layers.library 47.108 (1.11.2026) GFOpenLayers, AmiCradle Team\r\n";
 static const char lib_ver[] __attribute__((used)) =
-    "\0$VER: layers.library 47.108 (1.11.2026) OpenLayers, AmigaChrome Team";
+    "\0$VER: layers.library 47.108 (1.11.2026) GFOpenLayers, AmiCradle Team";
 static const char gfx_name[] = "graphics.library";
 
 /* A hook as utility.library calls one: A0 the hook, A2 the object, A1 the
@@ -191,7 +191,7 @@ static void L_SwapBitsRastPortClipRect(REG(a0, struct RastPort *rp), REG(a1, str
 }
 
 /* x and y are WORDs (NDK 3.2's layers protos): a caller built with them
- * sets only d0.w and d1.w, and OpenIntuition's click hit test was measured
+ * sets only d0.w and d1.w, and GFOpenIntuition's click hit test was measured
  * passing garbage in the upper halves, so only the low words are read. */
 static struct Layer *L_WhichLayer(REG(a0, struct Layer_Info *li), REG(d0, LONG x), REG(d1, LONG y), OB)
 {
@@ -272,7 +272,7 @@ static LONG L_SetLayerInfoBounds(REG(a0, struct Layer_Info *li), REG(a1, const s
 }
 
 #ifdef OL_COMPOSITE
-/* Our own calls (include/graphics/openlayers.h): the composited mode */
+/* Our own calls (include/graphics/gfopenlayers.h): the composited mode */
 static LONG L_ComposeLayerInfo(REG(a0, struct Layer_Info *li), REG(a1, struct BitMap *bm), REG(d0, ULONG flags), OB)
 {
     return ol_ComposeLayerInfo(&base->ol, li, bm, flags);

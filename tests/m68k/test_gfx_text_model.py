@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-# OpenGfx text's reference model (tests/m68k/test_gfx_text.sh): makes random
+# GFOpenGfx text's reference model (tests/m68k/test_gfx_text.sh): makes random
 # fonts, strings and RastPorts, works out what graphics.library's text calls
 # answer and draw, a pixel at a time from the rules (library/text/README.md),
 # and writes them as a C header for test_gfx_text.c to check the core

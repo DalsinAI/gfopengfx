@@ -1,4 +1,4 @@
-# graphics.library's jump table, as OpenGfx builds it: LVO, call, registers.
+# graphics.library's jump table, as GFOpenGfx builds it: LVO, call, registers.
 # Written from the NDK 3.2 graphics_lib.fd's published order; build-amiga.sh
 # checks it against the stove's graphics_lib.fd (amigachrome-guest
 # libraries/common/check_fd.py) and check_regs.py checks every area's

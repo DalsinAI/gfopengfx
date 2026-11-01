@@ -1,9 +1,9 @@
 #!/bin/sh
-# OpenGfx graphics.library with the os32-gcc16 stove (GCC 16.2.0-open2):
+# GFOpenGfx graphics.library with the os32-gcc16 stove (GCC 16.2.0-open2):
 # checks graphics.lvo against the NDK 3.2 graphics_lib.fd and every area's
 # gfx_lvo_ registers against graphics.lvo, then builds
 #   graphics.library    the replacement (47.100), a resident module
-#   opengfx.library     the same code under its own name, for the ABI tests
+#   gfopengfx.library     the same code under its own name, for the ABI tests
 #   GfxFaceABITest      the face's calls side by side with OS 3.2's
 # from library/graphics (the face), library/core and each area's
 # library/<area>/graphics.sources (OWNERS.md); gen_stubs.py stubs whatever
@@ -14,7 +14,7 @@ set -eu
 HERE=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 LIB=$(CDPATH= cd -- "$HERE/.." && pwd)
 TOP=$(CDPATH= cd -- "$LIB/.." && pwd)
-STOVE=${STOVE:-"$HOME/AmigaChrome/stoves/os32-gcc16"}
+STOVE=${STOVE:-"$HOME/AmiCradle/stoves/os32-gcc16"}
 P="$STOVE/prefix"
 CC=${CC:-"$P/bin/m68k-amigaos-gcc"}
 CXX=${CXX:-"$P/bin/m68k-amigaos-g++"}
@@ -67,7 +67,7 @@ done
 python3 "$HERE/gen_stubs.py" "$HERE/graphics.lvo" "$OUT/obj/defined.txt" "$OUT/obj"
 "$CC" $COMMON -c -o "$OUT/obj/stubs.o" "$OUT/obj/gfx_stubs.c"
 
-for name in graphics opengfx; do
+for name in graphics gfopengfx; do
   # shellcheck disable=SC2086
   "$CC" $COMMON -I"$OUT/obj" -DLIBNAME="\"$name.library\"" -o "$OUT/libs/$name.library" \
     "$HERE/opengfx_lib.c" $OBJS "$OUT/obj/stubs.o" -lgcc

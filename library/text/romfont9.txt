@@ -1,4 +1,4 @@
-# OpenKick's ROM screen font, 9 pixels high: topaz.font 9 (10 x 9 cells,
+# GFOpenKick's ROM screen font, 9 pixels high: topaz.font 9 (10 x 9 cells,
 # baseline row 7, one descender row), the name old programs open. The letters
 # are DejaVu Sans Mono's (see DEJAVU-LICENCE.txt), finished by hand in
 # romfont8.txt and grown here a row taller and a column or two wider, each
