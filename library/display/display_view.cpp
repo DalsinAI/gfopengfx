@@ -1003,12 +1003,6 @@ void gd_FreeDBufInfo(gfx_env *env, gd_dbufinfo *dbi)
             *pp = dbi->link1;
             break;
         }
-    if (state *s = st(env))
-        for (void **pp = &s->dispq; *pp; pp = &static_cast<gd_dbufinfo *>(*pp)->link2)
-            if (*pp == dbi) {
-                *pp = dbi->link2;
-                break;
-            }
     env->enable(env->ctx);
     release(env, dbi, sizeof(gd_dbufinfo));
 }
@@ -1037,27 +1031,17 @@ void gd_vblank(gfx_env *env)
     gb->vbcounter++;
     /* the coming field's list (the LOF bit says which field this is) */
     if (gb->actiview && st(env)) set_cop2(env, field_list(env, (env->chip_read(env->ctx, GD_VPOSR) & 0x8000) != 0));
-    /* ChangeVPBitMap: a field has now shown the bitmaps changed before the
-     * last blank: DispMessage */
-    if (state *s = st(env)) {
-        while (gd_dbufinfo *d = static_cast<gd_dbufinfo *>(s->dispq)) {
-            s->dispq = d->link2;
-            d->link2 = nullptr;
-            if (d->dispmessage.replyport) env->reply_msg(env->ctx, &d->dispmessage);
-        }
-    }
-    /* and the new bitmap is shown from this frame on, the old one free:
-     * SafeMessage now, DispMessage once this field is shown */
+    /* ChangeVPBitMap: the copper has taken this field's list, so the new
+     * bitmap is shown from this field on and the old one is free: both
+     * messages now, SafeMessage first (as AROS does). DispMessage used to
+     * wait a field more, so a program that waits for it before its next
+     * ChangeScreenBuffer, as the RKM's double buffering does, got half the
+     * field rate (25 frames a second on PAL; 1 Nov 2026) */
     while (gd_dbufinfo *d = static_cast<gd_dbufinfo *>(gb->dblist)) {
         gb->dblist = d->link1;
         d->link1 = nullptr;
         if (d->safemessage.replyport) env->reply_msg(env->ctx, &d->safemessage);
-        if (state *s = st(env)) {
-            d->link2 = s->dispq;
-            s->dispq = d;
-        } else if (d->dispmessage.replyport) {
-            env->reply_msg(env->ctx, &d->dispmessage);
-        }
+        if (d->dispmessage.replyport) env->reply_msg(env->ctx, &d->dispmessage);
     }
     /* WaitTOF */
     gfx_list *q = &gb->tof_waitq;
