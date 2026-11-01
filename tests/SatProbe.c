@@ -8,7 +8,7 @@
  *   m68k-amigaos-gcc -noixemul -m68040 -O2 -o SatProbe tests/SatProbe.c
  * Measured on OS 3.2.3 (graphics 47.10, 24-bit ACRTG Workbench, W33): with 300 and 1000 obtains and one
  * fewer releases the pen stays held; with all released it is handed out again.
- * Team 5. MIT, Copyright (c) 2026 AmigaChrome Team. */
+ * Team 5. MIT, Copyright (c) 2026 AmiCradle Team. */
 #include <exec/types.h>
 #include <intuition/intuition.h>
 #include <graphics/view.h>

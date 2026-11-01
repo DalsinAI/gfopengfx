@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 /* CompTest: GFOpenLayers' composited mode on the Workbench screen, from the
- * Shell. Copyright (c) 2026 AmigaChrome Team. MIT.
+ * Shell. Copyright (c) 2026 AmiCradle Team. MIT.
  *
  *   CompTest INFO         is the Workbench screen composited (and how; with 47.102, why not)
  *   CompTest TIME [N]     the whole screen composed again, and a full-screen window behind and in front, N times

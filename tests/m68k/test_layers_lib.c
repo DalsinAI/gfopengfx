@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 /* GFOpenLayers' library code (library/layers/layers_lib.c) against a model.
- * Copyright (c) 2026 AmigaChrome Team. MIT.
+ * Copyright (c) 2026 AmiCradle Team. MIT.
  *
  * exec and graphics.library are played here: bitmaps are a byte a pixel,
  * BltBitMap copies, clears and exclusive-ors them (overlapping or not, and

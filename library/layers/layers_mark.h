@@ -2,7 +2,7 @@
 /* GFOpenLayers' composited mode: what a drawing call drew, from its
  * registers as layers_comp.c's thunks save them (0-7 d0-d7, 8 a0, 9 a1).
  * Pure, so tests/m68k/test_comp_marks.sh runs it under qemu-m68k against
- * the drawing itself. Copyright (c) 2026 AmigaChrome Team. MIT.
+ * the drawing itself. Copyright (c) 2026 AmiCradle Team. MIT.
  *
  * A mark is a rectangle from the layer's top left; the compositor composes
  * only marked rectangles, so a mark must hold every pixel the call can

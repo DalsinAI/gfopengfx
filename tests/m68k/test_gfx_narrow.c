@@ -7,7 +7,7 @@
  * here is made twice, on two equal rasters: once with clean arguments, once
  * with garbage in the upper parts; the rasters and the answers must match.
  * The env, arena and hooks are test_gfx_face.c's. Copyright (c) 2026
- * AmigaChrome Team. MIT. */
+ * AmiCradle Team. MIT. */
 #define main face_main
 #include "test_gfx_face.c"
 #undef main

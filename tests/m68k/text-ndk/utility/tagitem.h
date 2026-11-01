@@ -1,4 +1,4 @@
-/* host NDK overlay (tests only): utility/tagitem.h. MIT, AmigaChrome Team. */
+/* host NDK overlay (tests only): utility/tagitem.h. MIT, AmiCradle Team. */
 #ifndef UTILITY_TAGITEM_H
 #define UTILITY_TAGITEM_H
 #include <exec/types.h>

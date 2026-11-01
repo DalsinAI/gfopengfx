@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 /*
  * GFOpenGfx premultiplied ARGB reference compositing.
- * Copyright (c) 2026 AmigaChrome Team.
+ * Copyright (c) 2026 AmiCradle Team.
  *
  * No tables, SIMD or host assumptions here: this is the portable 68k
  * correctness path. Accelerated providers are checked against these bytes.

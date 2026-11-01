@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // GFOpenGfx text: the ROM fonts topaz 8 and topaz 9, DejaVu Sans Mono's letters
 // finished by hand (romfont8.txt, romfont9.txt; DEJAVU-LICENCE.txt).
-// Copyright (c) 2026 AmigaChrome Team. MIT; the letters as DEJAVU-LICENCE.txt.
+// Copyright (c) 2026 AmiCradle Team. MIT; the letters as DEJAVU-LICENCE.txt.
 // Made by mkfont.py; do not edit.
 #include "topaz_data.h"
 

@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT */
-/* OpenGfx display: what the core's files share. Copyright (c) 2026 AmigaChrome
+/* OpenGfx display: what the core's files share. Copyright (c) 2026 AmiCradle
  * Team. MIT. Lean C++: no Amiga headers, no globals, no runtime. */
 #ifndef OPENGFX_DISPLAY_INT_H
 #define OPENGFX_DISPLAY_INT_H

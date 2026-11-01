@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 /* GFOpenGfx text: graphics.library's font and text calls, as a lean C++
- * core with no Amiga headers. Copyright (c) 2026 AmigaChrome Team. MIT.
+ * core with no Amiga headers. Copyright (c) 2026 AmiCradle Team. MIT.
  *
  * C and C++ both include this. The structures are the NDK's by their own
  * tags (struct RastPort, TextFont, TextAttr, TextExtent, TagItem): the

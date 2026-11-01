@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
 # GFOpenGfx text: builds topaz_data.cpp, the ROM fonts topaz 8 and topaz 9,
-# from romfont8.txt and romfont9.txt. Copyright (c) 2026 AmigaChrome Team. MIT.
+# from romfont8.txt and romfont9.txt. Copyright (c) 2026 AmiCradle Team. MIT.
 #
 # The glyphs are DejaVu Sans Mono's letters (DEJAVU-LICENCE.txt), drawn one
 # bit deep with the font's own hinting and finished by hand for this ROM:
@@ -125,7 +125,7 @@ def emit(out):
     w('// SPDX-License-Identifier: MIT\n')
     w('// GFOpenGfx text: the ROM fonts topaz 8 and topaz 9, DejaVu Sans Mono\'s letters\n')
     w('// finished by hand (romfont8.txt, romfont9.txt; DEJAVU-LICENCE.txt).\n')
-    w('// Copyright (c) 2026 AmigaChrome Team. MIT; the letters as DEJAVU-LICENCE.txt.\n')
+    w('// Copyright (c) 2026 AmiCradle Team. MIT; the letters as DEJAVU-LICENCE.txt.\n')
     w('// Made by mkfont.py; do not edit.\n')
     w('#include "topaz_data.h"\n\n')
     w('extern "C" const char gt_topaz_name[] = "topaz.font";\n\n')

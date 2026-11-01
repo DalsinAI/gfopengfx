@@ -9,7 +9,7 @@
  * box the call's geometry gives (cut to the layer), not more.
  * WritePixelLine8's and ScalePixelArray's marks are checked against the
  * row and the destination their arguments give.
- * MIT, Copyright (c) 2026 AmigaChrome Team. */
+ * MIT, Copyright (c) 2026 AmiCradle Team. */
 #include <stdio.h>
 #include <string.h>
 #include <exec/types.h>

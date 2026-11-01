@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 /* GFOpenGfx graphics.library, the face's calls in plain C arguments.
- * Copyright (c) 2026 AmigaChrome Team. MIT.
+ * Copyright (c) 2026 AmiCradle Team. MIT.
  *
  * gfx_face.cpp (lean C++, no Amiga headers) does the work: bitmaps and
  * rasters, RastPort state, colour maps and pen sharing, regions, layer

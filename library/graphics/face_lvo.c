@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 /* GFOpenGfx graphics.library: the face's LVOs in their registers.
- * Copyright (c) 2026 AmigaChrome Team. MIT.
+ * Copyright (c) 2026 AmiCradle Team. MIT.
  *
  * Each gfx_lvo_<Call> takes the fd's arguments in the registers
  * graphics.lvo lists (check_regs.py compares them), with A6 the library

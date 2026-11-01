@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 /* DisplayABITest: GFOpenGfx graphics.library's display (library/display)
- * side by side with OS 3.2's graphics.library. Copyright (c) 2026 AmigaChrome
+ * side by side with OS 3.2's graphics.library. Copyright (c) 2026 AmiCradle
  * Team. MIT.
  *
  * One script of calls is run through OS 3.2's graphics.library and then

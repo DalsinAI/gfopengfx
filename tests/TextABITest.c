@@ -1,5 +1,5 @@
 /* TextABITest: GFOpenGfx's text calls (library/text) side by side with OS
- * 3.2's graphics.library. Copyright (c) 2026 AmigaChrome Team. MIT.
+ * 3.2's graphics.library. Copyright (c) 2026 AmiCradle Team. MIT.
  *
  * Opens OS 3.2's graphics.library and GFOpenGfx's built under its own name
  * (gfopengfx.library, library/graphics/build-amiga.sh) and makes each call

@@ -3,7 +3,7 @@
 files takes graphics.lvo's registers in its order (then A6), is defined
 once, and in its owner's directory (OWNERS.md). Exit 1 on any difference.
 
-  check_regs.py graphics.lvo OWNERS.md file.c ...      MIT, AmigaChrome Team."""
+  check_regs.py graphics.lvo OWNERS.md file.c ...      MIT, AmiCradle Team."""
 import os, re, sys
 
 def read_lvo(path):

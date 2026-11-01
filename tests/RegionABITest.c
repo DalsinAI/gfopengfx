@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 /* RegionABITest: GFOpenGfx's regions (library/core/gfx_region.c) side by
- * side with OS 3.2's graphics.library. Copyright (c) 2026 AmigaChrome Team.
+ * side with OS 3.2's graphics.library. Copyright (c) 2026 AmiCradle Team.
  * MIT.
  *
  * Each call is made on an OS 3.2 region (NewRegion, OrRectRegion...) and

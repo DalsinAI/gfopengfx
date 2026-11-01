@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT */
-/* OpenLayers' own calls: the composited mode. Copyright (c) 2026 AmigaChrome
+/* OpenLayers' own calls: the composited mode. Copyright (c) 2026 AmiCradle
  * Team. MIT.
  *
  * layers.library 47.101 and up (GFOpenLayers; OS 3.2's layers.library has

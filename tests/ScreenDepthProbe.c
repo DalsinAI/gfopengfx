@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 /* ScreenDepthProbe: which screens the running ROM opens, by resolution and
- * depth, and one of them held on show. Copyright (c) 2026 AmigaChrome Team.
+ * depth, and one of them held on show. Copyright (c) 2026 AmiCradle Team.
  * MIT.
  *
  * It began as the Team's probe of SysInfo 4.4 quitting at once on the open
