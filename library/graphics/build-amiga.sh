@@ -38,7 +38,7 @@ CXXFLAGS="-std=gnu++23 -fno-exceptions -fno-rtti -fno-threadsafe-statics -fno-as
   -fno-unwind-tables -nostdlib++ -ffreestanding"
 
 # the sources: the face's and core's, then each area's list
-SRCS="$HERE/face_lvo.c $HERE/gfx_face.cpp $LIB/core/gfx_core.c $LIB/core/gfx_rp.c $LIB/core/gfx_region.c"
+SRCS="$HERE/face_lvo.c $HERE/gfx_dispatch.c $HERE/gfx_face.cpp $LIB/core/gfx_core.c $LIB/core/gfx_rp.c $LIB/core/gfx_region.c"
 for area in display text gels; do
   list="$LIB/$area/graphics.sources"
   [ -f "$list" ] || { echo "$area: no graphics.sources yet, stubbed"; continue; }
@@ -56,9 +56,11 @@ python3 "$HERE/check_regs.py" "$HERE/graphics.lvo" "$HERE/OWNERS.md" $C_SRCS
 OBJS=""
 for f in $SRCS; do
   o="$OUT/obj/$(basename "$(dirname "$f")")_$(basename "$f").o"
+  # the dispatch takes its records from the SDK header (include/graphics/gfxdispatch.h)
+  inc=""; [ "$f" = "$HERE/gfx_dispatch.c" ] && inc="-I$TOP/include"
   case "$f" in
     *.cpp) "$CXX" $COMMON $CXXFLAGS -c -o "$o" "$f" ;;
-    *) "$CC" $COMMON -c -o "$o" "$f" ;;
+    *) "$CC" $COMMON $inc -c -o "$o" "$f" ;;
   esac
   OBJS="$OBJS $o"
 done
@@ -78,6 +80,9 @@ for name in graphics gfopengfx; do
   [ -z "$data" ] || { echo "data or bss in $name.library: $data" >&2; exit 1; }
   bad=$("$NM" "$OUT/libs/$name.library" | grep -E '__cxa_|__gxx_personality|_ZTI|_ZTS|_GLOBAL__sub_I_|_ZGV|_Znw|_Zdl' || true)
   [ -z "$bad" ] || { echo "C++ runtime in $name.library: $bad" >&2; exit 1; }
+  # the dispatch (gfx_dispatch.c): 22 drawing slots point at it, 178 slots in all
+  n=$(grep -c '(APTR)gfx_dispatch_' "$OUT/obj/gfx_vectors.h")
+  [ "$n" = 22 ] || { echo "$name.library: $n dispatched slots, not 22" >&2; exit 1; }
   # the A5 LVOs (face_lvo.c): each stub pushes A6, then A5 itself
   for call in LockLayerRom UnlockLayerRom AttemptLockLayerRom; do
     "$OBJDUMP" -d "$OUT/libs/$name.library" |
@@ -88,5 +93,19 @@ done
 
 "$CC" -m68040 -specs="$TOP/build/m68k-soft-m68040.specs" -O2 -fno-delete-null-pointer-checks -Wall -Wextra -Werror -Wno-pointer-sign -Wno-format -noixemul \
   -o "$OUT/tests/GfxFaceABITest" "$TOP/tests/GfxFaceABITest.c"
+
+# the SDK (include/graphics/gfxdispatch.h, proto/inline): a provider and a
+# look built against it, alone and with gfopengpu's gfx.h first (RTG= a
+# gfopenrtg checkout, or this repository's copy); each call is its LVO
+for first in none "$TOP/include" ${RTG:+"$RTG/include"}; do
+  pre=""; [ "$first" = none ] || pre="-include $first/gfopengpu/gfx.h"
+  # shellcheck disable=SC2086
+  "$CC" -m68040 -O2 -Wall -Wextra -Werror -noixemul $pre -I"$TOP/include" -c -o "$OUT/obj/sdk_check.o" "$TOP/tests/GfxDispatchSDK.c"
+done
+for lvo in 1062 1068 1074 1080 1086 1092; do
+  "$OBJDUMP" -d "$OUT/obj/sdk_check.o" | grep -Eq "jsr %?a6@\(-$lvo\)" ||
+    { echo "GfxDispatchSDK: no call to -$lvo(a6)" >&2; exit 1; }
+done
+echo "SDK: gfxdispatch.h, clib, inline and proto build, alone and after gfx.h; six LVOs called"
 echo "$OUT/tests/GfxFaceABITest ($(wc -c < "$OUT/tests/GfxFaceABITest") bytes)"
 sha256sum "$OUT"/libs/* "$OUT"/tests/* 2>/dev/null || true

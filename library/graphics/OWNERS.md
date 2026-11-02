@@ -1,6 +1,6 @@
-# graphics.library 47.100: who writes each LVO
+# graphics.library 47.101: who writes each LVO
 
-GFOpenGfx's graphics.library is four areas built into one library: gfx-face (`library/graphics/`, this directory), gfx-display (`library/display/`), gfx-text (`library/text/`) and gfx-gels (`library/gels/`). `graphics.lvo` is the jump table; this file says who owns each slot. 172 slots: gfx-display 43, gfx-face 88, gfx-gels 23, gfx-text 18 (the nine private slots are the face's, as stubs answering 0).
+GFOpenGfx's graphics.library is four areas built into one library: gfx-face (`library/graphics/`, this directory), gfx-display (`library/display/`), gfx-text (`library/text/`) and gfx-gels (`library/gels/`). `graphics.lvo` is the jump table; this file says who owns each slot. 178 slots: gfx-display 43, gfx-face 94, gfx-gels 23, gfx-text 18 (the nine private slots are the face's, as stubs answering 0). The last six, -1062 to -1092, are GFOpenGfx's own (47.101 and up): the face's drawing dispatch, gfx-dispatch (`gfx_dispatch.c`).
 
 ## The contract
 
@@ -8,6 +8,7 @@ GFOpenGfx's graphics.library is four areas built into one library: gfx-face (`li
 - **Register entries**: each owner defines `gfx_lvo_<Call>` for its LVOs in a C file of its own directory, built by the Amiga compiler with the NDK headers, taking the fd's registers in graphics.lvo's order and then `GFX_REG(a6, struct GfxBase *)`. `check_regs.py` reads every `library/*/*.c` and checks each `gfx_lvo_` definition's registers against graphics.lvo. The face's shell (`opengfx_lib.c`) puts the symbols in the vector table; `gen_stubs.py` makes a stub (answering 0) for every `gfx_lvo_` no area defines yet, so the library links with any subset of the areas. Each area lists the files that go into the library, one per line relative to its directory (`.c` built as C, `.cpp` as lean C++), in `library/<area>/graphics.sources`; `build-amiga.sh` builds them.
 - **Init**: `int gfx_init_<area>(struct gfx_env *)` / `void gfx_exit_<area>(struct gfx_env *)`, face, display, text, gels in that order. Stubbed (1 / nothing) when missing.
 - **Hooks between areas** (`gfx_env.h`, stubbed when missing): `gfx_hook_vp_colors` (display: a ViewPort's colours changed), `gfx_hook_set_font` (text: SetFont, for InitRastPort), `gfx_hook_blt_bitmap` (gels: BltBitMap the CPU copy does not take), `gfx_hook_wait_blit` (gels: WaitBlit before the CPU draws), `gfx_hook_vsprites` (display, called by gels' DrawGList with the VSprites it placed).
+- **The drawing dispatch** (gfx-dispatch, the face's `gfx_dispatch.c`, 47.101): a provider (GFOpenRTG) and a look (GFOpenLook) register through the six GF extension LVOs, with gfopengpu.library's OGFX records and rules (`include/graphics/gfxdispatch.h`, which repeats `include/gfopengpu/gfx.h`'s). For 22 drawing calls (Text, TextLength, TextExtent, TextFit, RectFill, BltBitMap, BltTemplate, ScrollRaster, BltPattern, SetRast, Draw, PolyDraw, WritePixel, ReadPixel, BltBitMapRastPort, BltMaskBitMapRastPort, ClipBlit, WriteChunkyPixels, WritePixelArray8, WritePixelLine8, ReadPixelLine8, ReadPixelArray8) the face defines `gfx_dispatch_<Call>` in the slot's registers; `gen_stubs.py` puts it in the vector table in place of `gfx_lvo_<Call>`, and it asks the look (RectFill and Text only), then the provider, then calls the owner's `gfx_lvo_<Call>` with the registers as they came. The owners' entries do not change and are not asked to know about it. Its state is `gfx_private_of(GfxBase)->dispatch`, cleared by `lib_init` before the areas' inits.
 - **Calls the face gives the others**, plain C in `library/graphics/gfx_face.h`: `gfx_AllocBitMap`, `gfx_FreeBitMap`, `gfx_GetBitMapAttr`, `gfx_InitBitMap`, `gfx_AllocRaster`, `gfx_FreeRaster`, `gfx_InitRastPort`, `gfx_GetColorMap`, `gfx_FreeColorMap`, `gfx_SetRGB32CM`, `gfx_GetRGB32`, each `(struct gfx_env *, the fd's arguments)`. The drawing is the core's: call `library/core`'s `ogfx_rp_*` directly.
 
 ## GfxBase: who sets what
@@ -195,3 +196,9 @@ GFOpenGfx's graphics.library is four areas built into one library: gfx-face (`li
 | -1044 | GetRPAttrsA | a0 a1 | gfx-face | `gfx_lvo_GetRPAttrsA` |
 | -1050 | BestModeIDA | a0 | gfx-display | `gfx_lvo_BestModeIDA` |
 | -1056 | WriteChunkyPixels | a0 d0 d1 d2 d3 a2 d4 | gfx-face | `gfx_lvo_WriteChunkyPixels` |
+| -1062 | GFX_DispatchVersion | - | gfx-face | `gfx_lvo_GFX_DispatchVersion` |
+| -1068 | GFX_RegisterProvider | a0 | gfx-face | `gfx_lvo_GFX_RegisterProvider` |
+| -1074 | GFX_UnregisterProvider | a0 | gfx-face | `gfx_lvo_GFX_UnregisterProvider` |
+| -1080 | GFX_RegisterLook | a0 | gfx-face | `gfx_lvo_GFX_RegisterLook` |
+| -1086 | GFX_UnregisterLook | a0 | gfx-face | `gfx_lvo_GFX_UnregisterLook` |
+| -1092 | GFX_DispatchStatus | - | gfx-face | `gfx_lvo_GFX_DispatchStatus` |
