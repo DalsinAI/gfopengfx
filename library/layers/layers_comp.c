@@ -50,15 +50,15 @@
 #include <graphics/gfxbase.h>
 #include <graphics/gfopenlayers.h>
 /* the public GFOpenGPU and GFOpenRTG headers and their inline calls (not
- * proto/opengpu.h: opengpu/module.h has a field named SysBase, which
+ * proto/gfopengpu.h: gfopengpu/module.h has a field named SysBase, which
  * ol_sysbase.h makes a macro) */
-#include <opengpu/opengpu.h>
-#include <openrtg/openrtg.h>
+#include <gfopengpu/gfopengpu.h>
+#include <gfopenrtg/gfopenrtg.h>
 #include "../../include/oa_protos_begin.h"   /* the protos' unused varargs wrappers dropped */
 #define OPENGPU_BASE_NAME (cb->ogpu)
-#include <inline/opengpu.h>
+#include <inline/gfopengpu.h>
 #define OPENRTG_BASE_NAME (cb->ortg)
-#include <inline/openrtg.h>
+#include <inline/gfopenrtg.h>
 #define DOS_BASE_NAME dos
 #include <proto/dos.h>
 #include "../../include/oa_protos_end.h"
