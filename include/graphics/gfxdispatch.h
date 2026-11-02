@@ -4,7 +4,8 @@
  *
  * GF extension, graphics.library 47.101 (not OS 3.2's): six calls after OS
  * 3.2's last LVO (-1056 WriteChunkyPixels), with the arguments, registers
- * and results of gfopengpu.library's OGFX_ calls of the same job:
+ * and results of gfopengpu.library's OGFX_ calls of the same job, and from
+ * 47.102 a seventh, GFX_RegisterProviderPri:
  *
  *  -1062 ULONG GFX_DispatchVersion()()                          OGFX_Version
  *  -1068 LONG  GFX_RegisterProvider(struct OGFXProviderV1 *)(a0) OGFX_RegisterProvider
@@ -12,21 +13,55 @@
  *  -1080 LONG  GFX_RegisterLook(struct OGFXLookV1 *)(a0)         OGFX_RegisterLook
  *  -1086 LONG  GFX_UnregisterLook(APTR owner)(a0)                OGFX_UnregisterLook
  *  -1092 ULONG GFX_DispatchStatus()()                           OGFX_Status
+ *  -1098 LONG  GFX_RegisterProviderPri(struct OGFXProviderV1 *, LONG pri)(a0, d0)  (47.102)
  *
  * graphics.library's own drawing calls ask the look (RectFill and Text),
- * then the provider (the 22 calls of struct OGFXProviderAll), then draw
+ * then the providers (the 22 calls of struct OGFXProviderAll), then draw
  * themselves, with no SetFunction: the rules are those of GFOpenGfx in
  * gfopengpu.library (include/gfopengpu/gfx.h, OGFX interface 1.5), which
  * the records, requests and status bits below repeat word for word, under
  * the same names and guards, so a provider builds against either header,
- * or both in either order. GFX_DispatchVersion() answers 1.5 as
- * OGFX_Version() does. GFX_DispatchStatus() always has
- * OGFX_STATUS_PATCHED and OGFX_STATUS_ENABLED (every call of
- * graphics.library goes through the dispatch, and its own drawing is on),
- * never OGFX_STATUS_AMICRADLE; PROVIDER, LOOK and LOOK_BUSY as in gfx.h.
+ * or both in either order. GFX_DispatchVersion() answers 1.5 in 47.101, as
+ * OGFX_Version() does, and 1.6 from 47.102 (1.5 and the provider chain).
+ * GFX_DispatchStatus() always has OGFX_STATUS_PATCHED and
+ * OGFX_STATUS_ENABLED (every call of graphics.library goes through the
+ * dispatch, and its own drawing is on), never OGFX_STATUS_AMICRADLE; LOOK
+ * and LOOK_BUSY as in gfx.h, PROVIDER while one provider or more is in.
+ *
+ * The provider chain (graphics.library 47.102, new; gfx.h's text below says
+ * "one provider", as gfopengpu.library and graphics.library 47.101 keep):
+ *
+ *   - Up to GFXDISPATCH_PROVIDERS providers are in at once, each with its
+ *     own copied record (gfx.h's rules for each: the record copied as far as
+ *     its size goes, the rest NULL; its requests filled the same way).
+ *   - They are asked in order of priority, highest first; equals in the
+ *     order they came in. A call asks the look (RectFill and Text), then each
+ *     provider whose record has the call, until one answers non-zero, then
+ *     graphics.library's own code. Each provider gets the request as it was
+ *     filled, whatever one before it wrote there.
+ *   - GFX_RegisterProviderPri(record, pri) registers at pri (the low byte,
+ *     signed, as ln_Pri); GFX_RegisterProvider(record) is
+ *     GFX_RegisterProviderPri(record, GFXDISPATCH_PRI_DEFAULT). The
+ *     priority is an argument, not a field: the records stay gfx.h 1.5's.
+ *   - An owner already in that registers again replaces its own entry (the
+ *     new record and priority; at the same priority it keeps its place),
+ *     never another's. A new owner when every slot is taken is refused (0).
+ *   - GFX_UnregisterProvider(owner) takes out that owner's provider only;
+ *     calls from then on don't reach it, a call already inside it runs on
+ *     (its slot keeps the record until a later registration reuses it).
+ *   - The priorities in use: GFXDISPATCH_PRI_RTG for an RTG system's
+ *     provider, which draws on its own bitmaps and declines the rest
+ *     (GFOpenRTG); GFXDISPATCH_PRI_DEFAULT for GFX_RegisterProvider and
+ *     for a provider registered through gfopengpu.library's
+ *     OGFX_RegisterProvider; GFXDISPATCH_PRI_FAST for gfopengpu.library's
+ *     planar fast paths, asked for what the others decline.
+ *   - Old providers need no change: on 47.101 GFX_RegisterProvider still
+ *     takes the one place, on 47.102 it joins the chain at priority 0.
  *
  * Ask first: GFX_DISPATCH_AVAILABLE(GfxBase) says the calls are there (a
- * jump table that reaches -1092, and graphics.library 47.101 or later). */
+ * jump table that reaches -1092, and graphics.library 47.101 or later);
+ * GFX_DISPATCH_CHAIN_AVAILABLE(GfxBase) says the chain and
+ * GFX_RegisterProviderPri are (-1098, and 47.102 or later). */
 #ifndef GRAPHICS_GFXDISPATCH_H
 #define GRAPHICS_GFXDISPATCH_H
 
@@ -311,13 +346,24 @@ struct OGFXLookV1 {
 
 #include <exec/libraries.h>
 
-/* graphics.library 47.101: the first with the dispatch */
+/* graphics.library 47.101: the first with the dispatch; 47.102: the
+ * provider chain and GFX_RegisterProviderPri */
 #define GFXDISPATCH_LIB_VERSION  47
 #define GFXDISPATCH_LIB_REVISION 101
+#define GFXDISPATCH_CHAIN_LIB_REVISION 102
 
-/* GFX_DispatchVersion(): the OGFX interface the dispatch keeps, 1.5 */
+/* GFX_DispatchVersion(): the OGFX interface the dispatch keeps, 1.5, and
+ * from 47.102 1.6, 1.5 with the provider chain */
 #define GFXDISPATCH_INTERFACE_VERSION  1
-#define GFXDISPATCH_INTERFACE_REVISION 5
+#define GFXDISPATCH_INTERFACE_REVISION 6
+#define GFXDISPATCH_CHAIN_INTERFACE ((1UL << 16) | 6)   /* GFX_DispatchVersion() at least this: the chain */
+
+/* The provider chain (47.102): how many providers at once, and the
+ * priorities in use (higher is asked first) */
+#define GFXDISPATCH_PROVIDERS 4
+#define GFXDISPATCH_PRI_RTG      20     /* an RTG system's provider (GFOpenRTG): its own bitmaps */
+#define GFXDISPATCH_PRI_DEFAULT  0      /* GFX_RegisterProvider, and gfopengpu's OGFX_RegisterProvider */
+#define GFXDISPATCH_PRI_FAST   (-20)    /* gfopengpu.library's planar fast paths: what the others decline */
 
 /* The calls' LVOs */
 #define GFXDISPATCH_LVO_VERSION             (-1062)
@@ -326,12 +372,20 @@ struct OGFXLookV1 {
 #define GFXDISPATCH_LVO_REGISTERLOOK        (-1080)
 #define GFXDISPATCH_LVO_UNREGISTERLOOK      (-1086)
 #define GFXDISPATCH_LVO_STATUS              (-1092)
+#define GFXDISPATCH_LVO_REGISTERPROVIDERPRI (-1098)   /* 47.102 */
 #define GFXDISPATCH_NEGSIZE                 1092   /* lib_NegSize at least this */
+#define GFXDISPATCH_CHAIN_NEGSIZE           1098   /* and this for the chain (47.102) */
 
 #define GFX_DISPATCH_AVAILABLE(gfxbase) \
     ((gfxbase) && ((struct Library *)(gfxbase))->lib_NegSize >= GFXDISPATCH_NEGSIZE && \
      (((struct Library *)(gfxbase))->lib_Version > GFXDISPATCH_LIB_VERSION || \
       (((struct Library *)(gfxbase))->lib_Version == GFXDISPATCH_LIB_VERSION && \
        ((struct Library *)(gfxbase))->lib_Revision >= GFXDISPATCH_LIB_REVISION)))
+
+#define GFX_DISPATCH_CHAIN_AVAILABLE(gfxbase) \
+    ((gfxbase) && ((struct Library *)(gfxbase))->lib_NegSize >= GFXDISPATCH_CHAIN_NEGSIZE && \
+     (((struct Library *)(gfxbase))->lib_Version > GFXDISPATCH_LIB_VERSION || \
+      (((struct Library *)(gfxbase))->lib_Version == GFXDISPATCH_LIB_VERSION && \
+       ((struct Library *)(gfxbase))->lib_Revision >= GFXDISPATCH_CHAIN_LIB_REVISION)))
 
 #endif /* GRAPHICS_GFXDISPATCH_H */

@@ -1,20 +1,25 @@
 #!/bin/sh
-# GFOpenGfx graphics.library 47.101's drawing dispatch
+# GFOpenGfx graphics.library 47.102's drawing dispatch
 # (library/graphics/gfx_dispatch.c) under qemu-m68k: built with an m68k
 # cross GCC for the 68040 at -O0 and -O2 with the real face and core (the
 # face's sixteen drawing calls) and stand-ins for text's four and gels' two,
 # run by tests/m68k/test_gfx_dispatch.c, whose every line a python3 model
 # written here, from include/gfopengpu/gfx.h's rules and the order of
 # gfopenrtg's library/ogfx/ogfx_lib.c, checks: with nothing registered each
-# call draws and answers as its owner's entry does; a provider of each
-# record size (1.0, v1, 1.4 and longer) is asked for the calls its record
-# has room for and no others, with the request as graphics.library reads
-# the registers; a call it declines reaches the owner with the registers as
-# they came; the look is asked first on RectFill and Text; a look that
-# draws with RectFill gets the call back and declines it; the registry's
-# rules (records refused, a second look refused, taking a look out while a
-# call is inside it). Then the library checks: check_regs.py over the face
-# and the dispatch, gen_stubs.py (22 slots dispatched, 178 in all), and nm:
+# call draws and answers as its owner's entry does; chains of up to four
+# providers of each record size (1.0, v1, 1.4 and longer) and priority are
+# asked in the chain's order (highest priority first, equals as they came)
+# for the calls their records have room for and no others, each with the
+# request as graphics.library reads the registers (whatever a provider
+# before it that declined wrote there), until one takes the call; a call
+# all decline reaches the owner with the registers as they came; the look
+# is asked first on RectFill and Text; a look that draws with RectFill
+# gets the call back and declines it; the registry's rules (records
+# refused, the chain's order, a decline falling through, the same owner
+# again replacing its own entry, one owner out leaving the others, a full
+# chain refused, 1.0 and v1 records in a chain, a second look refused,
+# taking a look out while a call is inside it). Then the library checks: check_regs.py over the face
+# and the dispatch, gen_stubs.py (22 slots dispatched, 179 in all), and nm:
 # the dispatch has no .data, .bss or C++ runtime and calls only the owners'
 # entries.
 #   sh tests/m68k/test_gfx_dispatch.sh
@@ -41,9 +46,9 @@ inc="-I$g -I$core -I$here/dispatch-ndk -I$here/gfx_face_ndk -I$here/../host-ndk 
 
 cat > "$tmp/model.py" <<'PY'
 # The model: what each line of test_gfx_dispatch.c's output must say, from
-# gfx.h's rules and ogfx_lib.c's order (look, then provider, then
-# graphics.library's own code), worked out here and not taken from the
-# library.
+# gfx.h's rules, ogfx_lib.c's order (look, then provider, then
+# graphics.library's own code) and gfxdispatch.h's provider chain, worked
+# out here and not taken from the library.
 import sys
 
 lines = open(sys.argv[1]).read().split("\n")
@@ -106,7 +111,7 @@ def area_answer(c, a):
     return s16(v) if c == 1 else v
 
 # the registry's rules, line by line (test_gfx_dispatch.c rules())
-RULES = """VER 00010005
+RULES = """VER 00010006
 ST 00000003
 PR null 0
 PR abi2 0
@@ -117,7 +122,7 @@ PR a 1
 PR b 1
 UP c 0
 UP null 0
-UP a 0
+UP a 1
 ST 00000007
 UP b 1
 UP b 0
@@ -142,9 +147,48 @@ ST 00000003
 LR b 1
 UL a 0
 UL b 1
-ST 00000003""".split("\n")
+ST 00000003
+PR a 1
+PRP b 10 1
+PRP c -10 1
+PRP d 10 1
+ST 00000007
+ORDER 4 bdac -
+PRP e 0 0
+ORDER 4 bdac -
+ORDER 4 bd d
+ORDER 13 bd d 1234b0d0
+PRP a 20 1
+ORDER 4 abdc -
+PRP b 10 1
+ORDER 4 abdc -
+PRP d 10 1
+PRP c -10 1
+ORDER 4 abdc -
+ORDER 1 abc -
+ORDER 13 ab -
+ORDER 1 ab b ffff9040
+UP d 1
+UP d 0
+ST 00000007
+ORDER 4 abc -
+PRP e -10 1
+ORDER 4 abc -
+ORDER 6 abce -
+LR a 1
+ORDER 4 Labc -
+ORDER 0 Labce -
+ORDER 4 L L
+UL a 1
+UP a 1
+UP b 1
+UP c 1
+UP d 0
+UP e 1
+ST 00000003
+ORDER 4 - -""".split("\n")
 
-prov = None; look = None; take = 0; ltake = 0; scn = -1
+chain = []; look = None; ltake = 0; scn = -1
 for want in RULES:
     l = nxt(); checks += 1
     if l != want: err("rules: %r, want %r" % (l, want))
@@ -162,15 +206,27 @@ while pos < len(lines):
     elif t == "FORBID":
         if f[1] != f[2] or f[3] != "0" or f[1] == "0": err("Forbid and Permit: " + l)
     elif t == "SCN":
+        # SCN np lm lnull ltake, then SP p size nullmask take pri how and
+        # REGP p for each provider, in the order they register
         scn += 1
-        pm, size, nullmask, lm, lnull, take, ltake = int(f[1]), int(f[2]), h(f[3]), int(f[4]), h(f[5]), h(f[6]), h(f[7])
-        prov = (size, nullmask) if pm else None
+        np, lm, lnull, ltake = int(f[1]), int(f[2]), h(f[3]), h(f[4])
         look = lnull if lm else None
         rnd = min(scn, ROUNDS) & 15
-        if pm and nxt() != "REGP 1": err("provider of %d bytes refused" % size)
+        chain = []
+        for k in range(np):
+            g = nxt().split(); checks += 1
+            if g[0] != "SP" or int(g[1]) != k: err("provider %d: %s" % (k, " ".join(g))); continue
+            size, nullmask, take, pri = int(g[2]), h(g[3]), h(g[4]), int(g[5])
+            if g[6] == "0" and pri != 0: err("GFX_RegisterProvider is priority 0")
+            if nxt() != "REGP %d 1" % k: err("provider %d of %d bytes refused" % (k, size))
+            # the chain: highest priority first, equals in the order they came
+            at = len(chain)
+            for j, q in enumerate(chain):
+                if q[4] < pri: at = j; break
+            chain.insert(at, (k, size, nullmask, take, pri))
         if lm and nxt() != "REGL 1": err("look refused")
         st = h(nxt().split()[1])
-        want = ST_PATCHED | ST_ENABLED | (ST_PROVIDER if pm else 0) | (ST_LOOK if lm else 0)
+        want = ST_PATCHED | ST_ENABLED | (ST_PROVIDER if chain else 0) | (ST_LOOK if lm else 0)
         if st != want: err("status %08x want %08x" % (st, want))
     elif t == "C":
         c, n = int(f[1]), int(f[2]); a = [h(x) for x in f[3:3 + n]]
@@ -184,16 +240,20 @@ while pos < len(lines):
             if g[:4] != ["ASK", "L", str(bit), str(taken)]: err("%s: look not asked: %s" % (NAMES[c], " ".join(g[:4])))
             elif [h(x) for x in g[4:]] != req: err("%s: look's request %s want %s" % (NAMES[c], g[4:], ["%08x" % x for x in req]))
             if taken: path = "look"
-        # the provider: the calls its record has room for, a NULL entry not
-        if path == "area" and prov is not None:
-            size, nullmask = prov
-            k = SLOT[c]
-            if 16 + 4 * k + 4 <= min(size, 104) and not (nullmask >> k) & 1:
+        # the providers in the chain's order: each whose record has room
+        # for the call and no NULL entry, until one takes it, each with the
+        # request as filled
+        who = None
+        if path == "area":
+            for (pn, size, nullmask, take, pri) in chain:
+                k = SLOT[c]
+                if not (16 + 4 * k + 4 <= min(size, 104) and not (nullmask >> k) & 1): continue
                 g = nxt().split()
                 taken = (take >> k) & 1
-                if g[:4] != ["ASK", "P", str(k), str(taken)]: err("%s: provider not asked: %s" % (NAMES[c], " ".join(g[:4])))
-                elif [h(x) for x in g[4:]] != req: err("%s: provider's request %s want %s" % (NAMES[c], g[4:], ["%08x" % x for x in req]))
-                if taken: path = "provider"
+                if g[:4] != ["ASK", "P%d" % pn, str(k), str(taken)]:
+                    err("%s: provider %d not asked: %s" % (NAMES[c], pn, " ".join(g[:4]))); break
+                elif [h(x) for x in g[4:]] != req: err("%s: provider %d's request %s want %s" % (NAMES[c], pn, g[4:], ["%08x" % x for x in req]))
+                if taken: path = "provider"; who = pn; break
         paths[(c, path)] = paths.get((c, path), 0) + 1
         if path == "area" and c not in FACE:
             g = nxt().split()
@@ -209,7 +269,7 @@ while pos < len(lines):
             if c in FACE and untouched != "1": err("%s: taken by the %s, but drawn too" % (NAMES[c], path))
             if path == "look": want = (0x0bad0000 + min(scn, ROUNDS)) & M if c == 0 else 0
             elif c in RESULT:
-                v = 0x12348000 + SLOT[c] * 16 + rnd
+                v = 0x12348000 + who * 0x1000 + SLOT[c] * 16 + rnd
                 want = s16(v) if RESULT[c] == "W" else v
             else: want = 0
             if r != want: err("%s: taken by the %s, answered %08x want %08x" % (NAMES[c], path, r, want))
@@ -256,18 +316,19 @@ python3 "$g/gen_stubs.py" "$g/graphics.lvo" "$tmp/defined" "$tmp" | cut -c1-80
 n=$(grep -c '^    (APTR)gfx_dispatch_' "$tmp/gfx_vectors.h" || true)
 [ "$n" = 22 ] || { echo "FAIL gfx_vectors.h dispatches $n slots, not 22"; fail=1; }
 n=$(grep -c '^    (APTR)gfx_' "$tmp/gfx_vectors.h" || true)
-[ "$n" = 178 ] || { echo "FAIL gfx_vectors.h has $n slots, not 178"; fail=1; }
+[ "$n" = 179 ] || { echo "FAIL gfx_vectors.h has $n slots, not 179"; fail=1; }
 for call in AreaMove AreaDraw AreaEllipse AreaEnd DrawEllipse EraseRect; do
   grep -q "^    (APTR)gfx_lvo_$call," "$tmp/gfx_vectors.h" || { echo "FAIL $call is not its owner's entry"; fail=1; }
 done
 python3 - "$tmp/gfx_vectors.h" <<'PY' || fail=1
 import re, sys
 v = [l for l in open(sys.argv[1]) if l.startswith("    (APTR)gfx_")]
-last = [re.match(r"\s*\(APTR\)gfx_lvo_(\w+), /\* (-\d+)", l).groups() for l in v[-6:]]
+last = [re.match(r"\s*\(APTR\)gfx_lvo_(\w+), /\* (-\d+)", l).groups() for l in v[-7:]]
 want = [("GFX_DispatchVersion", "-1062"), ("GFX_RegisterProvider", "-1068"), ("GFX_UnregisterProvider", "-1074"),
-        ("GFX_RegisterLook", "-1080"), ("GFX_UnregisterLook", "-1086"), ("GFX_DispatchStatus", "-1092")]
+        ("GFX_RegisterLook", "-1080"), ("GFX_UnregisterLook", "-1086"), ("GFX_DispatchStatus", "-1092"),
+        ("GFX_RegisterProviderPri", "-1098")]
 assert last == want, last
-print("vectors: the six GF extension calls at -1062 to -1092")
+print("vectors: the seven GF extension calls at -1062 to -1098")
 PY
 "$cc" -m68040 -O2 $warn -I"$g" -c -o "$tmp/stubs.o" "$tmp/gfx_stubs.c" || fail=1
 [ $fail = 0 ] && echo "test_gfx_dispatch: all passed"

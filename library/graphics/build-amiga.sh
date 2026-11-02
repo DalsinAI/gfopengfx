@@ -80,7 +80,7 @@ for name in graphics gfopengfx; do
   [ -z "$data" ] || { echo "data or bss in $name.library: $data" >&2; exit 1; }
   bad=$("$NM" "$OUT/libs/$name.library" | grep -E '__cxa_|__gxx_personality|_ZTI|_ZTS|_GLOBAL__sub_I_|_ZGV|_Znw|_Zdl' || true)
   [ -z "$bad" ] || { echo "C++ runtime in $name.library: $bad" >&2; exit 1; }
-  # the dispatch (gfx_dispatch.c): 22 drawing slots point at it, 178 slots in all
+  # the dispatch (gfx_dispatch.c): 22 drawing slots point at it, 179 slots in all
   n=$(grep -c '(APTR)gfx_dispatch_' "$OUT/obj/gfx_vectors.h")
   [ "$n" = 22 ] || { echo "$name.library: $n dispatched slots, not 22" >&2; exit 1; }
   # the A5 LVOs (face_lvo.c): each stub pushes A6, then A5 itself
@@ -102,10 +102,10 @@ for first in none "$TOP/include" ${RTG:+"$RTG/include"}; do
   # shellcheck disable=SC2086
   "$CC" -m68040 -O2 -Wall -Wextra -Werror -noixemul $pre -I"$TOP/include" -c -o "$OUT/obj/sdk_check.o" "$TOP/tests/GfxDispatchSDK.c"
 done
-for lvo in 1062 1068 1074 1080 1086 1092; do
+for lvo in 1062 1068 1074 1080 1086 1092 1098; do
   "$OBJDUMP" -d "$OUT/obj/sdk_check.o" | grep -Eq "jsr %?a6@\(-$lvo\)" ||
     { echo "GfxDispatchSDK: no call to -$lvo(a6)" >&2; exit 1; }
 done
-echo "SDK: gfxdispatch.h, clib, inline and proto build, alone and after gfx.h; six LVOs called"
+echo "SDK: gfxdispatch.h, clib, inline and proto build, alone and after gfx.h; seven LVOs called"
 echo "$OUT/tests/GfxFaceABITest ($(wc -c < "$OUT/tests/GfxFaceABITest") bytes)"
 sha256sum "$OUT"/libs/* "$OUT"/tests/* 2>/dev/null || true

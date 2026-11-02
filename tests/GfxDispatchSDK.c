@@ -1,9 +1,9 @@
 /* SPDX-License-Identifier: MIT */
-/* GFOpenGfx graphics.library 47.101: a provider and a look built against
+/* GFOpenGfx graphics.library 47.101 and up: providers and a look built against
  * the dispatch's SDK headers (include/graphics/gfxdispatch.h,
  * proto/gfxdispatch.h), as GFOpenRTG and GFOpenLook would register them.
  * library/graphics/build-amiga.sh compiles it alone and with gfopengpu's
- * include/gfopengpu/gfx.h first, and checks that each of the six calls is
+ * include/gfopengpu/gfx.h first, and checks that each of the seven calls is
  * its LVO. Not run: the host test (tests/m68k/test_gfx_dispatch.sh) runs
  * the dispatch itself. Copyright (c) 2026 AmiCradle Team. MIT. */
 #include <exec/types.h>
@@ -33,7 +33,7 @@ static LONG my_look_text(APTR userdata, struct OGFXTextRequest *r)
 }
 
 static struct OGFXProviderAll provider;
-static UBYTE owner;
+static UBYTE owner, owner2;
 
 ULONG gfxdispatch_sdk_check(void)
 {
@@ -53,6 +53,12 @@ ULONG gfxdispatch_sdk_check(void)
     look.rectfill = 0;
     look.text = my_look_text;
     s += GFX_RegisterProvider(&provider.v1);
+    if (GFX_DISPATCH_CHAIN_AVAILABLE(GfxBase) && GFX_DispatchVersion() >= GFXDISPATCH_CHAIN_INTERFACE) {
+        /* 47.102: a second provider in the chain, asked before the first */
+        provider.v1.owner = &owner2;
+        s += GFX_RegisterProviderPri(&provider.v1, GFXDISPATCH_PRI_RTG);
+        s += GFX_UnregisterProvider(&owner2);
+    }
     s += GFX_RegisterLook(&look);
     s += GFX_DispatchStatus() & (OGFX_STATUS_PROVIDER | OGFX_STATUS_LOOK);
     s += GFX_UnregisterLook(&owner);
