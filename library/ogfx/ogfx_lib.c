@@ -44,7 +44,7 @@
 #define REG OGFX_REG
 
 /* Zorro manufacturer of AmiCradle's own boards (amicradle-guest
- * common/protocol/amigachrome_zorro.h). The old id, 2011, is shared with UAE and
+ * common/protocol/amicradle_zorro.h). The old id, 2011, is shared with UAE and
  * home-made boards, so it is not taken as proof. */
 #define OGFX_AMICRADLE_MANUFACTURER 0xDA15
 
