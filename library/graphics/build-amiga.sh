@@ -8,7 +8,7 @@
 # from library/graphics (the face), library/core and each area's
 # library/<area>/graphics.sources (OWNERS.md); gen_stubs.py stubs whatever
 # no area defines yet.
-#   GUEST=~/src/amigachrome-guest sh library/graphics/build-amiga.sh
+#   GUEST=~/src/amicradle-guest sh library/graphics/build-amiga.sh
 set -eu
 
 HERE=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
@@ -23,7 +23,7 @@ OBJDUMP=${OBJDUMP:-"$P/bin/m68k-amigaos-objdump"}
 OUT=${OUT:-"$HERE/build-amiga"}
 # the ROM module's optimisation: -Os (size) by default; OPT=-O2 for speed
 OPT=${OPT:--Os}
-GUEST=${GUEST:?set GUEST to an amigachrome-guest checkout}
+GUEST=${GUEST:?set GUEST to an amicradle-guest checkout}
 mkdir -p "$OUT/libs" "$OUT/tests" "$OUT/obj"
 
 # NDK 3.2's fd, never fd13

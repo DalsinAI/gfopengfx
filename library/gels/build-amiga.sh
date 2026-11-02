@@ -3,7 +3,7 @@
 # into graphics.library through library/gels/graphics.sources, built by
 # library/graphics/build-amiga.sh; this builds that, then
 #   GelsABITest   the gels and blitter calls side by side with OS 3.2's
-#   GUEST=~/src/amigachrome-guest sh library/gels/build-amiga.sh
+#   GUEST=~/src/amicradle-guest sh library/gels/build-amiga.sh
 set -eu
 HERE=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 TOP=$(CDPATH= cd -- "$HERE/../.." && pwd)
@@ -15,7 +15,7 @@ sh "$TOP/library/graphics/build-amiga.sh"
 mkdir -p "$OUT/tests"
 # GFOpenAmigaGCC 16.2.0-open3's late-combine pass can store a copy one place late (GCC PR 123853;
 # GfxCoreABITest's font tables came out so): GelsABITest is built with the pass off until GFOpenAmigaGCC open4
-# (openamigagcc #29), on a compiler that knows the option. library/graphics/build-amiga.sh (run above; the ROM's build)
+# (gfopengcc #29), on a compiler that knows the option. library/graphics/build-amiga.sh (run above; the ROM's build)
 # is left as it is.
 LATE=""
 if "$CC" -fno-late-combine-instructions -S -o /dev/null -x c /dev/null 2>/dev/null; then LATE="-fno-late-combine-instructions"; fi

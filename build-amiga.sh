@@ -11,7 +11,7 @@ OUT=${OUT:-"$HERE/build-amiga"}
 mkdir -p "$OUT"
 # GFOpenAmigaGCC 16.2.0-open3's late-combine pass can store a copy one place late (GCC PR 123853): GfxCoreABITest's
 # open_fonts copied its test font's tables as "move.w (a0)+,(a0,d2.l)", each word one place late. Off until
-# GFOpenAmigaGCC open4 (openamigagcc #29), on a compiler that knows the option. Not in library/graphics or
+# GFOpenAmigaGCC open4 (gfopengcc #29), on a compiler that knows the option. Not in library/graphics or
 # library/layers: their builds are the ROM's (Team 4's), which W128 found clean.
 LATE=""
 if "$CC" -fno-late-combine-instructions -S -o /dev/null -x c /dev/null 2>/dev/null; then LATE="-fno-late-combine-instructions"; fi

@@ -1,6 +1,6 @@
 # layers.library's jump table, as GFOpenLayers will build it: LVO, call,
 # registers. To be checked against the NDK 3.2 layers_lib.fd in the stove
-# (amigachrome-guest libraries/common/check_fd.py) before the library shell
+# (amicradle-guest libraries/common/check_fd.py) before the library shell
 # is written; the shell's vector table follows it line for line.
 -30 InitLayers a0
 -36 CreateUpfrontLayer a0,a1,d0,d1,d2,d3,d4,a2

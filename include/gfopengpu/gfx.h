@@ -3,7 +3,7 @@
  *
  * GFOpenGfx inside gfopengpu.library (0.6 and later): the public calls.
  *
- * gfopengfx.library 1.1 (amigachrome-guest libraries/opengfx, commit 90aa66f)
+ * gfopengfx.library 1.1 (amicradle-guest libraries/opengfx, commit 90aa66f)
  * was brought into gfopengpu.library on 8 October 2026, so one library does
  * all the drawing. Its six calls are gfopengpu.library's LVOs from 66, in
  * gfopengfx.library's order, and the eight graphics.library calls GFOpenGfx owns
@@ -29,7 +29,7 @@
  * (GFOpenRTG) takes them through struct OGFXProviderAll (below) instead of
  * patching them itself. They have no LVOs of their own yet: programs reach
  * them through graphics.library. Screens, modes, bitmaps, palettes and
- * sprites stay with the RTG system (openamigartg DESIGN.md, "Who owns each
+ * sprites stay with the RTG system (gfopenrtg DESIGN.md, "Who owns each
  * call").
  *
  * The drawing LVOs take graphics.library's arguments in graphics.library's

@@ -2,9 +2,9 @@
 
 OpenGfx: accelerated graphics.library drawing for AmigaOS 3.x (AmigaChrome's AC090 leaves and OpenGPU), MIT, Copyright (c) 2026 AmiCradle Team.
 
-This repository starts from `DalsinAI/openamigartg` `library/ogfx` at 0b5f753, the copy that is built into gfopengpu.library from 0.6, with the header it uses (`include/gfopengpu/gfx.h`). `library/ogfx/FORK.md` records where GFOpenGfx came from (amigachrome-guest `libraries/opengfx`, gfopengfx.library 1.1) and every change since. openamigartg keeps its own copy and still builds it.
+This repository starts from `DalsinAI/gfopenrtg` `library/ogfx` at 0b5f753, the copy that is built into gfopengpu.library from 0.6, with the header it uses (`include/gfopengpu/gfx.h`). `library/ogfx/FORK.md` records where GFOpenGfx came from (amicradle-guest `libraries/opengfx`, gfopengfx.library 1.1) and every change since. gfopenrtg keeps its own copy and still builds it.
 
-It is the home for the open graphics.library work (amigachrome-guest `libraries/OPEN_LIBRARIES.md`, sections 2 and 4): clean-room, MIT, API and ABI compatible with OS 3.2's graphics.library, planar and chunky, built for the 68040 (all builds are 68040 only), with no GFOpenGPU needed and faster where AmiCradle's leaves or GFOpenGPU are there.
+It is the home for the open graphics.library work (amicradle-guest `libraries/OPEN_LIBRARIES.md`, sections 2 and 4): clean-room, MIT, API and ABI compatible with OS 3.2's graphics.library, planar and chunky, built for the 68040 (all builds are 68040 only), with no GFOpenGPU needed and faster where AmiCradle's leaves or GFOpenGPU are there.
 
 ## The core
 

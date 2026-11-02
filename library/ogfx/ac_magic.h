@@ -1,11 +1,11 @@
 /* SPDX-License-Identifier: MIT */
-/* A copy of amigachrome-guest common/amiga/ac_magic.h (at 90aa66f), the
+/* A copy of amicradle-guest common/amiga/ac_magic.h (at 90aa66f), the
  * source of truth for the tag and the published ids: GFOpenGfx's leaves need
- * it, and openamigartg builds on its own. Change the ids there first. */
+ * it, and gfopenrtg builds on its own. Change the ids there first. */
 #ifndef AC_MAGIC_H
 #define AC_MAGIC_H
 /* Magic functions: a function of ours that runs as host code on AmiCradle
- * and as its own 68k code everywhere else (amigachrome's
+ * and as its own 68k code everywhere else (amicradle's
  * docs/architecture/MAGIC_FUNCTIONS_AND_BRIDGE.md, part 1, and
  * machines/cpus/m68k-ac090/native/jit_magic.c).
  *
@@ -75,7 +75,7 @@
  * either half 65521 or more to the body (zlib never makes one), and one
  * with a NULL buf and len 1, which zlib reads anyway. */
 #define AC_MAGIC_ADLER32 0x00010007
-/* GFOpenGfx's leaves (openamigartg library/ogfx/ogfx_leaves.h, SPD-11): each takes
+/* GFOpenGfx's leaves (gfopenrtg library/ogfx/ogfx_leaves.h, SPD-11): each takes
  * one parameter block and returns how much it drew. AC090 leaves a block
  * that reaches anything but plain memory, or whose arithmetic would wrap
  * past 4 GB, to the body. */
