@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT */
-/* A copy of amicradle-guest common/amiga/ac_magic.h (at 90aa66f), the
+/* A copy of amicradle-guest common/amiga/ac_magic.h (at f842038), the
  * source of truth for the tag and the published ids: GFOpenGfx's leaves need
  * it, and gfopenrtg builds on its own. Change the ids there first. */
 #ifndef AC_MAGIC_H
@@ -93,6 +93,72 @@
  * on standard planar bitmaps, source/destination minterm and plane mask;
  * the destination planes involved. */
 #define AC_MAGIC_OGFX_PLANAR_BLIT 0x00010103
+/* uint32_t ogfx_scale_copy(const struct ogfx_scale_copy *): a rectangle
+ * copied 1 to 4 times the size, nearest neighbour, chunky or planar, within
+ * a destination clip; the destination pixels written. */
+#define AC_MAGIC_OGFX_SCALE_COPY 0x00010104
+/* GFOpenCrypto's operations (DalsinAI/gfopentls, library/oc_magic.h, which
+ * has each one's exact contract; AC090's side is jit_crypto.c). Byte
+ * arrays throughout; each writes only its first argument's range. */
+/* uint32_t ocm_probe(void): the OCF_* operations this machine runs as host
+ * code; the 68k body answers 0. AC090_MAGIC=verify does not compare it. */
+#define AC_MAGIC_OC_PROBE            0x00010200
+/* int32_t ocm_x25519(out[32], scalar[32], point[32]): RFC 7748; -1 for an
+ * all-zero result */
+#define AC_MAGIC_OC_X25519           0x00010201
+/* int32_t ocm_ed25519_verify(sig[64], pk[32], msg, len): 1 valid, 0 not */
+#define AC_MAGIC_OC_ED25519_VERIFY   0x00010202
+/* sntrup761: ocm_sntrup761_keypair(out[1158 + 1763], seed[32]),
+ * ocm_sntrup761_enc(out[1039 + 32], pk[1158], seed[32]),
+ * ocm_sntrup761_dec(out[32], ct[1039], sk[1763]) */
+#define AC_MAGIC_OC_SNTRUP761_KEYPAIR 0x00010203
+#define AC_MAGIC_OC_SNTRUP761_ENC    0x00010204
+#define AC_MAGIC_OC_SNTRUP761_DEC    0x00010205
+/* ocm_sha256_blocks(state[32], data, nblocks), ocm_sha512_blocks(state[64],
+ * data, nblocks): the compression functions, the state big-endian */
+#define AC_MAGIC_OC_SHA256_BLOCKS    0x00010206
+#define AC_MAGIC_OC_SHA512_BLOCKS    0x00010207
+/* ocm_chacha20(out[len], in, len, p[48] = key || nonce[8] || counter[8] BE);
+ * ocm_poly1305(tag[16], data, len, key[32]) */
+#define AC_MAGIC_OC_CHACHA20         0x00010208
+#define AC_MAGIC_OC_POLY1305         0x00010209
+/* int32_t ocm_aes(buf[len], len, key, keylen, iv[16], mode): CTR, CBC
+ * encrypt, CBC decrypt, ECB encrypt (0 to 3) */
+#define AC_MAGIC_OC_AES              0x0001020a
+/* int32_t ocm_rsa_public(out[nlen], sig[nlen], n, nlen, e, elen);
+ * int32_t ocm_ecdsa_verify(curve, qx, qy, r, s, hash, hlen) */
+#define AC_MAGIC_OC_RSA_PUBLIC       0x0001020b
+#define AC_MAGIC_OC_ECDSA_VERIFY     0x0001020c
+/* The open libraries' LVO bodies (libraries/OPEN_LIBRARIES.md, section 3):
+ * a library in bits 15-8, the LVO's slot (-LVO / 6) in bits 7-0. Each takes
+ * its arguments in the registers its .lvo table names and answers in D0
+ * (D0/D1 for a double or a 64-bit result), as the NDK's fd says; AC090's
+ * side is jit_openlibs.c, which says what each one writes. Tagged with
+ * AC_MAGIC_LVO below. */
+#define AC_MAGIC_LIB_UTILITY   0x00010300   /* utility.library */
+#define AC_MAGIC_LIB_SINGBAS   0x00010400   /* mathieeesingbas.library */
+#define AC_MAGIC_LIB_DOUBBAS   0x00010500   /* mathieeedoubbas.library */
+#define AC_MAGIC_LIB_SINGTRANS 0x00010600   /* mathieeesingtrans.library */
+#define AC_MAGIC_LIB_DOUBTRANS 0x00010700   /* mathieeedoubtrans.library */
+/* Motorola's FFP (libraries/openmathffp): the result in D0, and the
+ * condition codes as MOVE to CCR leaves them (X and C clear, N, Z and V
+ * as the autodocs say), their value in D1 too: each LVO's stub, which
+ * starts with the tag itself (no jump), moves the core's CCR there. */
+#define AC_MAGIC_LIB_FFP       0x00010800   /* mathffp.library */
+#define AC_MAGIC_LIB_FFPTRANS  0x00010900   /* mathtrans.library */
+/* The IEEE libraries' soft bodies (openmathieee's mathieee_soft.c and
+ * mathtrans_soft.c), which a library takes in place of its FPU bodies on a
+ * CPU with no FPU, or with the one softfpu.library emulates: the results
+ * of softfpu.library's core (a 68040's FPU with 68040.library). Their own
+ * ids, as they are their own functions: where the FPU bodies and the soft
+ * core differ (an invalid operation's NaN, a result rounded twice), an id
+ * names one of them. Only the calls whose results AC090 gives exactly are
+ * tagged (jit_openlibs.c lists them). */
+#define AC_MAGIC_LIB_SINGBAS_SOFT   0x00010A00   /* mathieeesingbas.library, soft */
+#define AC_MAGIC_LIB_DOUBBAS_SOFT   0x00010B00   /* mathieeedoubbas.library, soft */
+#define AC_MAGIC_LIB_SINGTRANS_SOFT 0x00010C00   /* mathieeesingtrans.library, soft */
+#define AC_MAGIC_LIB_DOUBTRANS_SOFT 0x00010D00   /* mathieeedoubtrans.library, soft */
+#define AC_MAGIC_LVO_ID(lib, lvo) ((lib) + (-(lvo)) / 6)
 
 #define AC_MAGIC_STR_(x) #x
 #define AC_MAGIC_STR(x) AC_MAGIC_STR_(x)
@@ -116,6 +182,25 @@
                          "\t.short\t0x0001\n"                                \
                          "\t.long\t" AC_MAGIC_STR(id) "\n"                   \
                          "\tjmp\t" AC_MAGIC_SYM(name##_acbody) "\n");        \
+    }
+
+/* A library's LVO body: the tag, then a jump to body, a C function that
+ * takes its arguments in registers (register ... __asm("d0")), external and
+ * kept (AC_MAGIC_KEEP). name is what the library's vector table holds:
+ *   AC_MAGIC_LVO(M_GetTagData, AC_MAGIC_LVO_ID(AC_MAGIC_LIB_UTILITY, -36), L_GetTagData)
+ *   static const APTR lib_vectors[] = { ..., (APTR)M_GetTagData, ... };
+ * The id is an expression the assembler works out. */
+#define AC_MAGIC_LVO(name, id, body)                                         \
+    void name(void);                                                         \
+    __attribute__((used, noinline, noclone)) static void name##_actag(void) \
+    {                                                                        \
+        __asm__ volatile("\t.globl\t" AC_MAGIC_SYM(name) "\n"                \
+                         AC_MAGIC_SYM(name) ":\n"                            \
+                         "\t.short\t0x600a\n"                                \
+                         "\t.long\t0x41434d46\n"                             \
+                         "\t.short\t0x0001\n"                                \
+                         "\t.long\t" AC_MAGIC_STR(id) "\n"                   \
+                         "\tjmp\t" AC_MAGIC_SYM(body) "\n");                 \
     }
 
 #endif
