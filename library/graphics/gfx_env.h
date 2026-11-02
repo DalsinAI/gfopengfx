@@ -98,10 +98,16 @@ enum { GFX_AREA_FACE = 0, GFX_AREA_DISPLAY = 1, GFX_AREA_TEXT = 2, GFX_AREA_GELS
 /* After the public GfxBase, at a fixed offset that leaves room for what
  * later NDKs publish (ABI test: sizeof(struct GfxBase) on OS 3.2). */
 #define GFX_PRIVATE_OFFSET 640u
+/* The face's drawing dispatch (gfx_dispatch.c, graphics.library 47.101):
+ * the registered provider and look and the busy count, laid out there with
+ * the NDK types of include/graphics/gfxdispatch.h. Cleared by lib_init
+ * before any area's init. */
+#define GFX_DISPATCH_BYTES 132u
 struct gfx_private {
     struct gfx_env env;
     void *area[GFX_AREAS];      /* each area allocates and owns its own */
     uint32_t reserved[8];
+    uint32_t dispatch[GFX_DISPATCH_BYTES / 4];
 };
 #define GFX_BASE_POSSIZE (GFX_PRIVATE_OFFSET + (uint32_t)sizeof(struct gfx_private))
 
@@ -117,6 +123,10 @@ static inline struct gfx_env *gfx_env_of(void *gfxbase)
 {
     return &gfx_private_of(gfxbase)->env;
 }
+
+/* gfx_dispatch.c: clears the dispatch (nothing registered); lib_init calls
+ * it before any area's init */
+void gfx_clear_dispatch(struct gfx_private *pv);
 
 /* ---- What each area gives the library (OWNERS.md) --------------------
  *

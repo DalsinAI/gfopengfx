@@ -39,7 +39,7 @@ elif ! grep -q "takes a0,d0" "$tmp/bad" || ! grep -q "gfx-face's" "$tmp/bad"; th
   echo "FAIL check_regs.py:"; cat "$tmp/bad"; fail=1
 fi
 n=$(grep -c '^-[0-9]' "$g/graphics.lvo")
-[ "$n" = 172 ] || { echo "FAIL graphics.lvo has $n slots, not 172"; fail=1; }
+[ "$n" = 178 ] || { echo "FAIL graphics.lvo has $n slots, not 178 (OS 3.2's 172 and GFOpenGfx's six)"; fail=1; }
 python3 - "$g/graphics.lvo" "$g/OWNERS.md" <<'PY' || fail=1
 import re, sys
 lvo = [l.split() for l in open(sys.argv[1]) if l.strip() and not l.startswith("#")]
@@ -481,6 +481,6 @@ done
 "$nm" "$tmp/face.o" >> "$tmp/defined"
 python3 "$g/gen_stubs.py" "$g/graphics.lvo" "$tmp/defined" "$tmp" | cut -c1-100
 "$cc" -m68040 -O2 $warn -I"$g" -c -o "$tmp/stubs.o" "$tmp/gfx_stubs.c" || fail=1
-grep -c 'gfx_lvo_' "$tmp/gfx_vectors.h" | grep -qx 344 || { echo "FAIL gfx_vectors.h is not 172 slots"; fail=1; }
+grep -c 'gfx_lvo_' "$tmp/gfx_vectors.h" | grep -qx 356 || { echo "FAIL gfx_vectors.h is not 178 slots"; fail=1; }
 [ $fail = 0 ] && echo "test_gfx_face: all passed"
 exit $fail

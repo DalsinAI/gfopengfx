@@ -2,7 +2,9 @@
 """GFOpenGfx graphics.library: makes gfx_vectors.h (the vector table, in
 graphics.lvo's order) and gfx_stubs.c (a stub for every gfx_lvo_, gfx_init_,
 gfx_exit_ and gfx_hook_ symbol no area's objects define, so the library
-links with any subset of the areas; OWNERS.md).
+links with any subset of the areas; OWNERS.md). A slot whose
+gfx_dispatch_<Call> is defined (gfx_dispatch.c, the drawing dispatch) gets
+that in the vector table, and the dispatch calls the slot's gfx_lvo_<Call>.
 
   gen_stubs.py graphics.lvo DEFINED OUTDIR
 
@@ -50,14 +52,20 @@ def main():
     defined = set()
     for line in open(sys.argv[2]):
         for w in line.split():
-            if re.match(r"^_?gfx_(lvo|init|exit|hook)_\w+$", w):
+            if re.match(r"^_?gfx_(lvo|init|exit|hook|dispatch)_\w+$", w):
                 defined.add(w.lstrip("_") if w.startswith("_gfx") else w)
     out = sys.argv[3]
     with open(out + "/gfx_vectors.h", "w") as v:
         v.write("/* made by gen_stubs.py from graphics.lvo: do not edit */\n")
         for n in names: v.write("extern void gfx_lvo_%s(void);\n" % n)
+        for n in names:
+            if "gfx_dispatch_" + n in defined: v.write("extern void gfx_dispatch_%s(void);\n" % n)
         v.write("#define GFX_VECTORS \\\n")
-        for i, n in enumerate(names): v.write("    (APTR)gfx_lvo_%s, /* -%d */ \\\n" % (n, 30 + 6 * i))
+        for i, n in enumerate(names):
+            if "gfx_dispatch_" + n in defined:
+                v.write("    (APTR)gfx_dispatch_%s, /* -%d, then gfx_lvo_%s */ \\\n" % (n, 30 + 6 * i, n))
+            else:
+                v.write("    (APTR)gfx_lvo_%s, /* -%d */ \\\n" % (n, 30 + 6 * i))
         v.write("\n")
     stubbed = []
     with open(out + "/gfx_stubs.c", "w") as s:
@@ -70,6 +78,8 @@ def main():
             if sym not in defined:
                 s.write(body + "\n")
                 stubbed.append(sym)
-    print("gen_stubs: %d LVOs, %d stubbed: %s" % (len(names), len(stubbed), " ".join(stubbed) or "none"))
+    dispatched = [n for n in names if "gfx_dispatch_" + n in defined]
+    print("gen_stubs: %d LVOs, %d dispatched, %d stubbed: %s" % (len(names), len(dispatched), len(stubbed),
+                                                                 " ".join(stubbed) or "none"))
 
 main()
