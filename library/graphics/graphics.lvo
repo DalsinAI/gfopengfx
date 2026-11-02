@@ -177,11 +177,13 @@
 -1056 WriteChunkyPixels a0,d0,d1,d2,d3,a2,d4
 # GF extension, graphics.library 47.101 and up (GFOpenGfx's own, not OS
 # 3.2's): the drawing dispatch, after OS 3.2's last LVO, so it meets none of
-# 3.2's slots, public or private. gfx_dispatch.c; the SDK header is
-# include/graphics/gfxdispatch.h. check_fd.py skips lines "beyond the fd".
+# 3.2's slots, public or private; -1098 from 47.102 (the provider chain).
+# gfx_dispatch.c; the SDK header is include/graphics/gfxdispatch.h.
+# check_fd.py skips lines "beyond the fd".
 -1062 GFX_DispatchVersion  # GF extension, graphics.library 47.101: beyond the fd
 -1068 GFX_RegisterProvider a0  # GF extension, graphics.library 47.101: beyond the fd
 -1074 GFX_UnregisterProvider a0  # GF extension, graphics.library 47.101: beyond the fd
 -1080 GFX_RegisterLook a0  # GF extension, graphics.library 47.101: beyond the fd
 -1086 GFX_UnregisterLook a0  # GF extension, graphics.library 47.101: beyond the fd
 -1092 GFX_DispatchStatus  # GF extension, graphics.library 47.101: beyond the fd
+-1098 GFX_RegisterProviderPri a0,d0  # GF extension, graphics.library 47.102: beyond the fd

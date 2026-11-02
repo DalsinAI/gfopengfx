@@ -1,13 +1,14 @@
 /* SPDX-License-Identifier: MIT */
-/* GFOpenGfx graphics.library 47.101: the drawing dispatch
+/* GFOpenGfx graphics.library 47.102: the drawing dispatch
  * (library/graphics/gfx_dispatch.c) over the real face and core for the
  * face's sixteen drawing calls, and over recording stand-ins for text's
  * four and gels' two. Each call runs twice from the same start: straight
  * into its owner's gfx_lvo_<Call> and through gfx_dispatch_<Call>, as the
  * vector table has it. Every line printed is checked by the python model
  * in test_gfx_dispatch.sh, written apart from the library from gfx.h's
- * rules and ogfx_lib.c's order: who is asked, with what request, who
- * draws, and what the call answers. Copyright (c) 2026 AmiCradle Team. MIT. */
+ * rules, ogfx_lib.c's order and gfxdispatch.h's provider chain: who is
+ * asked, in what order, with what request, who draws, and what the call
+ * answers. Copyright (c) 2026 AmiCradle Team. MIT. */
 #include <stdio.h>
 #include <string.h>
 #include "gfx_face.h"
@@ -93,6 +94,13 @@ U gfx_lvo_GFX_UnregisterProvider(void *, void *);
 U gfx_lvo_GFX_RegisterLook(void *, void *);
 U gfx_lvo_GFX_UnregisterLook(void *, void *);
 U gfx_lvo_GFX_DispatchStatus(void *);
+U gfx_lvo_GFX_RegisterProviderPri(void *, U, void *);
+
+/* quiet: the chain rules' calls (rules()), which record who was asked in
+ * order[] instead of printing each ask */
+static int quiet;
+static char order[32];
+static int norder;
 
 /* text's and gels' entries: they say what they got and answer from it */
 static int in_area = -1;               /* which call the stand-in expects; -1 none */
@@ -100,9 +108,9 @@ static U area_answer(int call, int n, const U *a)
 {
     U s = 0;
     int i;
-    printf("AREA %d", call);
-    for (i = 0; i < n; i++) { printf(" %08lx", (unsigned long)a[i]); s += a[i]; }
-    printf("\n");
+    if (!quiet) printf("AREA %d", call);
+    for (i = 0; i < n; i++) { if (!quiet) printf(" %08lx", (unsigned long)a[i]); s += a[i]; }
+    if (!quiet) printf("\n");
     if (call != in_area) fail("area stand-in reached for another call", call);
     return s * 2654435761u + (U)call;
 }
@@ -180,9 +188,15 @@ static const int req_words[NCALLS] = { 4, 4, 4, 9, 5, 12, 8, 7, 7, 2, 3, 3, 4, 4
 static const int result_word[NCALLS] = { 3, 3, -1, 8, -1, 11, -1, -1, -1, -1, -1, -1, 3, 3, -1, -1, -1, 9, 9, 9, 9, 9 };
 static int call_of_slot[NCALLS];
 
-static uint8_t owner_a, owner_b, owner_c, look_owner, look_owner2;
-static U take_mask, look_take, round_no;
-static void *const prov_ud = (void *)0x0ddba11;
+/* the providers: five, one more than the chain holds; provider i's owner
+ * is owner_p[i], its userdata &prov_ud[i], and take_of[i] the calls (by
+ * slot) it takes. In the rules they are a, b, c, d and e. */
+#define NPROV 5
+static uint8_t owner_p[NPROV], prov_ud[NPROV], look_owner, look_owner2;
+#define owner_a owner_p[0]
+#define owner_b owner_p[1]
+#define owner_c owner_p[2]
+static U take_of[NPROV], look_take, round_no;
 static void *const look_ud = (void *)0x10c4ed;
 static int asked_from;                 /* the call under way */
 
@@ -198,11 +212,21 @@ static LONG prov(int slot, APTR ud, void *req)
 {
     int call = call_of_slot[slot];
     U *r = req;
-    int taken = (take_mask >> slot) & 1;
-    if (ud != prov_ud) fail("provider userdata", slot);
+    int p = (int)((uint8_t *)ud - prov_ud), taken, i;
+    char who[4] = { 'P', 0, 0, 0 };
+    if (p < 0 || p >= NPROV) { fail("provider userdata", slot); return 0; }
+    taken = (take_of[p] >> slot) & 1;
     if (call != asked_from) fail("provider asked for another call", slot);
-    print_req("P", slot, taken, r, req_words[call]);
-    if (taken && result_word[call] >= 0) r[result_word[call]] = 0x12348000u + (U)slot * 16 + (round_no & 15);
+    if (quiet) {
+        if (norder < (int)sizeof order - 1) order[norder++] = (char)('a' + p);
+    } else {
+        who[1] = (char)('0' + p);
+        print_req(who, slot, taken, r, req_words[call]);
+    }
+    if (taken && result_word[call] >= 0)
+        r[result_word[call]] = 0x12348000u + (U)p * 0x1000 + (U)slot * 16 + (round_no & 15);
+    /* one that declines may write in the request: the next is given it as filled */
+    if (!taken) for (i = 0; i < req_words[call]; i++) r[i] ^= 0x5a5a5a5au + (U)i;
     return taken ? 1 + (LONG)rn(5) : 0;              /* any non-zero is "mine" */
 }
 #define PROV(k) static LONG p##k(APTR ud, void *req) { return prov(k, ud, req); }
@@ -214,7 +238,7 @@ static LONG (*const prov_fn[NCALLS])(APTR, void *) = {
 /* the record, with room after it that must never be read */
 static struct { struct OGFXProviderAll all; APTR after[4]; } rec;
 
-static void make_record(ULONG size, U nullmask, APTR owner)
+static void make_record(ULONG size, U nullmask, int p)
 {
     APTR *f = (APTR *)(void *)&rec.all.v1.rectfill;
     int k;
@@ -222,8 +246,8 @@ static void make_record(ULONG size, U nullmask, APTR owner)
     for (k = 0; k < 4; k++) rec.after[k] = (APTR)prov_fn[k];
     rec.all.v1.size = size;
     rec.all.v1.abi = OGFX_PROVIDER_ABI_V1;
-    rec.all.v1.owner = owner;
-    rec.all.v1.userdata = prov_ud;
+    rec.all.v1.owner = &owner_p[p];
+    rec.all.v1.userdata = &prov_ud[p];
 }
 
 static int look_mode;                  /* 0 the round's look; 1 re-entrant; 2 takes itself out */
@@ -234,7 +258,8 @@ static LONG look_rf(APTR ud, struct OGFXRectFillRequest *r)
     if (ud != look_ud) fail("look userdata", 0);
     if (look_mode == 0) {
         if (asked_from != 4) fail("look asked for another call", asked_from);
-        print_req("L", 0, taken, (const U *)(void *)r, 5);
+        if (quiet) order[norder++] = 'L';
+        else print_req("L", 0, taken, (const U *)(void *)r, 5);
         return taken ? 1 : 0;
     }
     /* the look draws its frame with RectFill itself, through the vector;
@@ -259,7 +284,8 @@ static LONG look_tx(APTR ud, struct OGFXTextRequest *r)
     int taken = (look_take >> 1) & 1;
     if (ud != look_ud) fail("look userdata", 1);
     if (asked_from != 0) fail("look asked for another call", asked_from);
-    print_req("L", 1, taken, (const U *)(void *)r, 4);
+    if (quiet) order[norder++] = 'L';
+    else print_req("L", 1, taken, (const U *)(void *)r, 4);
     if (taken) r->result = (LONG)(0x0bad0000u + round_no);
     return taken ? 1 : 0;
 }
@@ -397,23 +423,35 @@ static void one_call(int c, int wild)
 
 /* ---- the scenarios ------------------------------------------------------------- */
 
-static ULONG prov_size;
-static APTR prov_owner;
-static void scenario(int pm, U nullmask, int lm, U lnull)
+/* A scenario: np providers (np <= 4, all in the chain), each given as
+ * size index (1 the 1.0 record, 2 v1, 3 1.4, 4 longer), nullmask, take,
+ * priority and how (0 GFX_RegisterProvider, which is priority 0; 1
+ * GFX_RegisterProviderPri), registered in that order; and the look.
+ *   SCN np lm lnull ltake
+ *   SP p size nullmask take pri how, then REGP p answer, for each */
+struct sp { int pm; U nullmask, take; int pri, how; };
+static int prov_in[NPROV];
+static void scenario(int np, const struct sp *sp, int lm, U lnull)
 {
     static const ULONG sizes[5] = { 0, OGFX_PROVIDER_V1_0_SIZE, sizeof(struct OGFXProviderV1),
                                     sizeof(struct OGFXProviderAll), sizeof(struct OGFXProviderAll) + 8 };
     struct OGFXLookV1 look;
-    if (prov_owner) gfx_lvo_GFX_UnregisterProvider(prov_owner, GB);
+    int p;
+    for (p = 0; p < NPROV; p++)
+        if (prov_in[p]) { gfx_lvo_GFX_UnregisterProvider(&owner_p[p], GB); prov_in[p] = 0; }
     gfx_lvo_GFX_UnregisterLook(&look_owner, GB);
-    prov_owner = NULL;
-    prov_size = sizes[pm];
-    printf("SCN %d %lu %08lx %d %08lx %08lx %08lx\n", pm, (unsigned long)prov_size, (unsigned long)nullmask, lm,
-           (unsigned long)lnull, (unsigned long)take_mask, (unsigned long)look_take);
-    if (pm) {
-        prov_owner = rn(2) ? (APTR)&owner_a : (APTR)&owner_b;
-        make_record(prov_size, nullmask, prov_owner);
-        printf("REGP %lu\n", (unsigned long)gfx_lvo_GFX_RegisterProvider(&rec.all.v1, GB));
+    printf("SCN %d %d %08lx %08lx\n", np, lm, (unsigned long)lnull, (unsigned long)look_take);
+    for (p = 0; p < np; p++) {
+        U r;
+        int pri = sp[p].how ? sp[p].pri : 0;
+        take_of[p] = sp[p].take;
+        printf("SP %d %lu %08lx %08lx %d %d\n", p, (unsigned long)sizes[sp[p].pm], (unsigned long)sp[p].nullmask,
+               (unsigned long)sp[p].take, pri, sp[p].how);
+        make_record(sizes[sp[p].pm], sp[p].nullmask, p);
+        r = sp[p].how ? gfx_lvo_GFX_RegisterProviderPri(&rec.all.v1, (U)(LONG)pri, GB)
+                      : gfx_lvo_GFX_RegisterProvider(&rec.all.v1, GB);
+        printf("REGP %d %lu\n", p, (unsigned long)r);
+        prov_in[p] = r != 0;
         memset(&rec, 0x55, sizeof rec);          /* the record is copied: the caller may reuse it */
     }
     if (lm) {
@@ -426,43 +464,78 @@ static void scenario(int pm, U nullmask, int lm, U lnull)
     printf("ST %08lx\n", (unsigned long)gfx_lvo_GFX_DispatchStatus(GB));
 }
 
+static U take_any(void) { return rn(4) == 0 ? 0x3FFFFF : rn(4) == 0 ? 0 : rnd() & 0x3FFFFF; }
+
 static void rounds(void)
 {
+    struct sp sp[GFXDISPATCH_PROVIDERS];
     int k, c;
-    for (k = 0; k < NCALLS; k++) call_of_slot[slot_of[k]] = k;
-    /* nothing registered, then each record size and look at random */
+    /* nothing registered, then chains of up to four providers of each
+     * record size and priority, and a look, at random */
     for (round_no = 0; round_no < ROUNDS; round_no++) {
-        int pm = round_no < 2 ? 0 : (int)rn(5), lm = round_no < 2 ? 0 : (int)rn(2);
-        U nullmask = rn(3) ? 0 : rnd() & 0x3FFFFF, lnull = rn(4) ? 0 : rn(4);
-        take_mask = rn(4) == 0 ? 0x3FFFFF : rn(4) == 0 ? 0 : rnd() & 0x3FFFFF;
+        int np = round_no < 2 ? 0 : (int)rn(GFXDISPATCH_PROVIDERS + 1), lm = round_no < 2 ? 0 : (int)rn(2);
+        U lnull = rn(4) ? 0 : rn(4);
+        for (k = 0; k < np; k++) {
+            sp[k].pm = 1 + (int)rn(4);
+            sp[k].nullmask = rn(3) ? 0 : rnd() & 0x3FFFFF;
+            sp[k].take = take_any();
+            sp[k].pri = rn(3) ? (int)rn(5) - 2 : (rn(2) ? 127 : -128);
+            sp[k].how = (int)rn(2);
+        }
         look_take = rn(4);
         look_mode = 0;
-        scenario(pm, nullmask, lm, lnull);
+        scenario(np, sp, lm, lnull);
         for (c = 0; c < NCALLS; c++) one_call(c, 0);
         for (k = 0; k < 8; k++) one_call((int)rn(NCALLS), 0);
     }
-    /* every call taken, with any value in every number register */
-    take_mask = 0x3FFFFF;
+    /* every call taken, with any value in every number register: the
+     * first provider declines everything, the second takes everything */
+    sp[0].pm = 3; sp[0].nullmask = 0; sp[0].take = 0; sp[0].pri = 5; sp[0].how = 1;
+    sp[1].pm = 3; sp[1].nullmask = 0; sp[1].take = 0x3FFFFF; sp[1].pri = 0; sp[1].how = 0;
     look_take = 3;
-    scenario(3, 0, 1, 0);
+    scenario(2, sp, 1, 0);
     for (k = 0; k < 4; k++)
         for (c = 0; c < NCALLS; c++) one_call(c, 1);
-    take_mask = 0;
     look_take = 0;
-    scenario(0, 0, 0, 0);
+    scenario(0, sp, 0, 0);
 }
 
-/* the registry's rules (gfx.h), line by line */
+/* The chain's rules: call c through the dispatch, quiet, and print who was
+ * asked in order (a to e the providers, L the look), who took it (- none)
+ * and what it answered when taken.
+ *   ORDER c asked taker answer */
+static void order_of(int c)
+{
+    U a[12] = { 0 }, r;
+    int taker;
+    world_fill(&wb, 99);
+    (void)args_for(c, &wb, a, 0);
+    quiet = 1; norder = 0; asked_from = c; in_area = c;
+    r = invoke(c, 1, a, GB);
+    order[norder] = 0;
+    quiet = 0; asked_from = -1; in_area = -1;
+    taker = norder ? order[norder - 1] : '-';
+    if (taker == 'L' ? !(look_take & (c == 4 ? 1 : 2)) : taker != '-' && !((take_of[taker - 'a'] >> slot_of[c]) & 1))
+        taker = '-';
+    if (taker != '-' && result_word[c] >= 0 && taker != 'L')
+        printf("ORDER %d %s %c %08lx\n", c, norder ? order : "-", taker, (unsigned long)r);
+    else
+        printf("ORDER %d %s %c\n", c, norder ? order : "-", taker);
+}
+
+/* the registry's rules (gfx.h, and gfxdispatch.h's chain), line by line */
 static void rules(void)
 {
     struct OGFXLookV1 la = { sizeof(struct OGFXLookV1), OGFX_LOOK_ABI_V1, &look_owner, look_ud, look_rf, look_tx };
     struct OGFXLookV1 lb = { sizeof(struct OGFXLookV1), OGFX_LOOK_ABI_V1, &look_owner2, look_ud, look_rf, 0 };
     struct OGFXLookV1 bad;
     U a[12];
+    int k;
+    for (k = 0; k < NCALLS; k++) call_of_slot[slot_of[k]] = k;
     printf("VER %08lx\n", (unsigned long)gfx_lvo_GFX_DispatchVersion(GB));
     printf("ST %08lx\n", (unsigned long)gfx_lvo_GFX_DispatchStatus(GB));
-    /* providers: refused records, then one, a second in its place, owners */
-    make_record(sizeof(struct OGFXProviderAll), 0, &owner_a);
+    /* providers: refused records, then one, a second beside it, owners */
+    make_record(sizeof(struct OGFXProviderAll), 0, 0);
     printf("PR null %lu\n", (unsigned long)gfx_lvo_GFX_RegisterProvider(NULL, GB));
     rec.all.v1.abi = 2;
     printf("PR abi2 %lu\n", (unsigned long)gfx_lvo_GFX_RegisterProvider(&rec.all.v1, GB));
@@ -473,7 +546,7 @@ static void rules(void)
     printf("ST %08lx\n", (unsigned long)gfx_lvo_GFX_DispatchStatus(GB));
     rec.all.v1.owner = &owner_a;
     printf("PR a %lu\n", (unsigned long)gfx_lvo_GFX_RegisterProvider(&rec.all.v1, GB));
-    make_record(sizeof(struct OGFXProviderV1), 0, &owner_b);
+    make_record(sizeof(struct OGFXProviderV1), 0, 1);
     printf("PR b %lu\n", (unsigned long)gfx_lvo_GFX_RegisterProvider(&rec.all.v1, GB));
     printf("UP c %lu\n", (unsigned long)gfx_lvo_GFX_UnregisterProvider(&owner_c, GB));
     printf("UP null %lu\n", (unsigned long)gfx_lvo_GFX_UnregisterProvider(NULL, GB));
@@ -521,6 +594,72 @@ static void rules(void)
     printf("UL a %lu\n", (unsigned long)gfx_lvo_GFX_UnregisterLook(&look_owner, GB));
     printf("UL b %lu\n", (unsigned long)gfx_lvo_GFX_UnregisterLook(&look_owner2, GB));
     printf("ST %08lx\n", (unsigned long)gfx_lvo_GFX_DispatchStatus(GB));
+    /* the provider chain (47.102): a to e are providers 0 to 4, each with
+     * every call (a 1.4 record) and taking nothing unless said */
+    look_mode = 0;
+    look_take = 0;
+    for (k = 0; k < NPROV; k++) take_of[k] = 0;
+    make_record(sizeof(struct OGFXProviderAll), 0, 0);
+    printf("PR a %lu\n", (unsigned long)gfx_lvo_GFX_RegisterProvider(&rec.all.v1, GB));
+    make_record(sizeof(struct OGFXProviderAll), 0, 1);
+    printf("PRP b 10 %lu\n", (unsigned long)gfx_lvo_GFX_RegisterProviderPri(&rec.all.v1, 10, GB));
+    make_record(sizeof(struct OGFXProviderAll), 0, 2);
+    printf("PRP c -10 %lu\n", (unsigned long)gfx_lvo_GFX_RegisterProviderPri(&rec.all.v1, (U)-10, GB));
+    make_record(sizeof(struct OGFXProviderAll), 0, 3);
+    printf("PRP d 10 %lu\n", (unsigned long)gfx_lvo_GFX_RegisterProviderPri(&rec.all.v1, 10, GB));
+    memset(&rec, 0x55, sizeof rec);
+    printf("ST %08lx\n", (unsigned long)gfx_lvo_GFX_DispatchStatus(GB));
+    order_of(4);                                 /* by priority, equals as they came: b d a c */
+    make_record(sizeof(struct OGFXProviderAll), 0, 4);
+    printf("PRP e 0 %lu\n", (unsigned long)gfx_lvo_GFX_RegisterProviderPri(&rec.all.v1, 0, GB));   /* full */
+    order_of(4);
+    /* a decline falls through to the next; the one that takes it ends the call */
+    take_of[3] = 0x3FFFFF;
+    order_of(4);
+    order_of(13);
+    take_of[3] = 0;
+    /* the same owner again: its own entry, at its new priority, not another's */
+    make_record(sizeof(struct OGFXProviderAll), 0, 0);
+    printf("PRP a 20 %lu\n", (unsigned long)gfx_lvo_GFX_RegisterProviderPri(&rec.all.v1, 20, GB));
+    order_of(4);
+    /* again at the same priority: its place kept, before d (also 10) */
+    make_record(sizeof(struct OGFXProviderAll), 0, 1);
+    printf("PRP b 10 %lu\n", (unsigned long)gfx_lvo_GFX_RegisterProviderPri(&rec.all.v1, 10, GB));
+    order_of(4);
+    /* again at the same priority, a 1.0 record (four calls): its place kept */
+    make_record(OGFX_PROVIDER_V1_0_SIZE, 0, 3);
+    printf("PRP d 10 %lu\n", (unsigned long)gfx_lvo_GFX_RegisterProviderPri(&rec.all.v1, 10, GB));
+    make_record(sizeof(struct OGFXProviderV1), 0, 2);     /* and c a v1 record (eight calls) */
+    printf("PRP c -10 %lu\n", (unsigned long)gfx_lvo_GFX_RegisterProviderPri(&rec.all.v1, (U)-10, GB));
+    memset(&rec, 0x55, sizeof rec);
+    order_of(4);                                 /* RectFill: all four records have it */
+    order_of(1);                                 /* TextLength: not d's 1.0 record */
+    order_of(13);                                /* ReadPixel: neither d's nor c's */
+    take_of[1] = 1u << slot_of[1];               /* b takes TextLength: c not asked */
+    order_of(1);
+    take_of[1] = 0;
+    /* one owner out, the others as they were; a NULL entry not asked */
+    printf("UP d %lu\n", (unsigned long)gfx_lvo_GFX_UnregisterProvider(&owner_p[3], GB));
+    printf("UP d %lu\n", (unsigned long)gfx_lvo_GFX_UnregisterProvider(&owner_p[3], GB));
+    printf("ST %08lx\n", (unsigned long)gfx_lvo_GFX_DispatchStatus(GB));
+    order_of(4);
+    make_record(sizeof(struct OGFXProviderAll), 1u << slot_of[4], 4);
+    printf("PRP e -10 %lu\n", (unsigned long)gfx_lvo_GFX_RegisterProviderPri(&rec.all.v1, (U)-10, GB));
+    memset(&rec, 0x55, sizeof rec);
+    order_of(4);                                 /* e's RectFill is NULL */
+    order_of(6);                                 /* BltTemplate: e after c, as it came after */
+    /* the look still first */
+    printf("LR a %lu\n", (unsigned long)gfx_lvo_GFX_RegisterLook(&la, GB));
+    order_of(4);
+    order_of(0);
+    look_take = 1;
+    order_of(4);
+    look_take = 0;
+    printf("UL a %lu\n", (unsigned long)gfx_lvo_GFX_UnregisterLook(&look_owner, GB));
+    for (k = 0; k < NPROV; k++)
+        printf("UP %c %lu\n", 'a' + k, (unsigned long)gfx_lvo_GFX_UnregisterProvider(&owner_p[k], GB));
+    printf("ST %08lx\n", (unsigned long)gfx_lvo_GFX_DispatchStatus(GB));
+    order_of(4);
     look_mode = 0;
     asked_from = -1;
     (void)a;

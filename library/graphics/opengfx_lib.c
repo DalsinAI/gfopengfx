@@ -10,8 +10,9 @@
  * .data or .bss), the env made from exec, utility.library and the custom
  * chips, and the vector table in graphics.library's LVO order, which
  * gfx_vectors.h (made by gen_stubs.py from graphics.lvo) lists: OS 3.2's
- * 172 slots, then GFOpenGfx's six (47.101: the drawing dispatch's
- * registry, gfx_dispatch.c). 22 drawing slots go through the dispatch.
+ * 172 slots, then GFOpenGfx's seven (47.101: the drawing dispatch's
+ * registry, gfx_dispatch.c; 47.102: GFX_RegisterProviderPri, the provider
+ * chain). 22 drawing slots go through the dispatch.
  *
  * LIBNAME is "graphics.library" for the replacement and
  * "gfopengfx.library" for the side-by-side build the ABI tests open next to
@@ -41,16 +42,16 @@
 #define LIBNAME "graphics.library"
 #endif
 #define LIB_VERSION  47
-#define LIB_REVISION 101                /* 47.100 and up: GFOpenGfx; 47.101: the drawing dispatch (gfx_dispatch.c) */
+#define LIB_REVISION 102                /* 47.100 and up: GFOpenGfx; 47.101: the drawing dispatch (gfx_dispatch.c); 47.102: its provider chain */
 
 /* Run as a program, the library does nothing. This must stay the first code
  * in the file (-fno-toplevel-reorder). */
 int start(void) { return -1; }
 
 static const char lib_name[] = LIBNAME;
-static const char lib_id[] = "graphics.library 47.101 (02.11.2026) GFOpenGfx, AmiCradle Team\r\n";
+static const char lib_id[] = "graphics.library 47.102 (02.11.2026) GFOpenGfx, AmiCradle Team\r\n";
 static const char lib_ver[] __attribute__((used)) =
-    "\0$VER: graphics.library 47.101 (02.11.2026) GFOpenGfx, AmiCradle Team";
+    "\0$VER: graphics.library 47.102 (02.11.2026) GFOpenGfx, AmiCradle Team";
 static const char util_name[] = "utility.library";
 
 /* ---- the env: ctx is the library base -------------------------------- */
