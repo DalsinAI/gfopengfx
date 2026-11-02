@@ -44,7 +44,7 @@
  * as any translucent layer, then its own alpha over that at full: a pixel
  * with alpha 255 stays opaque, one with 0 shows at the layer's opacity, and
  * one between mixes the two. Opaque, it is copied as before, its alpha not
- * read. Intuition keys the screen's bar this way (amigachrome-guest
+ * read. Intuition keys the screen's bar this way (amicradle-guest
  * libraries/openintuition: IntuitionControlA's ICTRL_BarOpacity), with the
  * title and the depth gadget at 255 and the background at 0. Pens leave a
  * 32-bit pixel's alpha 0, so what is drawn into a keyed layer with pens

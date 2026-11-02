@@ -4,8 +4,8 @@
 #   layers.library       the replacement (47.100), a resident module
 #   gfopenlayers.library   the same code under its own name, for the ABI test
 #   LayersABITest        runs the same calls through both and lists every difference
-# The amigachrome-guest checkout with libraries/common/check_fd.py:
-#   GUEST=~/src/amigachrome-guest sh library/layers/build-amiga.sh
+# The amicradle-guest checkout with libraries/common/check_fd.py:
+#   GUEST=~/src/amicradle-guest sh library/layers/build-amiga.sh
 set -eu
 
 HERE=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
@@ -15,7 +15,7 @@ CC=${CC:-"$P/bin/m68k-amigaos-gcc"}
 OUT=${OUT:-"$HERE/build-amiga"}
 # the ROM module's optimisation: -Os (size) by default; OPT=-O2 for speed
 OPT=${OPT:--Os}
-GUEST=${GUEST:?set GUEST to an amigachrome-guest checkout}
+GUEST=${GUEST:?set GUEST to an amicradle-guest checkout}
 mkdir -p "$OUT/libs" "$OUT/tests"
 
 # NDK 3.2's fd, never fd13

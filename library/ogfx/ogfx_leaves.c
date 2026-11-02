@@ -1,13 +1,13 @@
 /* SPDX-License-Identifier: MIT */
 /* GFOpenGfx's leaves (ogfx_leaves.h): the reference C, behind ac_magic.h's
- * tags. AC090 runs its host versions instead (amigachrome's jit_magic.c);
+ * tags. AC090 runs its host versions instead (amicradle's jit_magic.c);
  * everything else runs this. Build it as ac_helpers.sh builds the helpers:
  * GCC, 32-bit ints, arguments on the stack (not -mregparm), with -fno-lto,
  * -fno-builtin and -fno-tree-loop-distribute-patterns, so no loop here
  * becomes a call to a C library this code may not have.
  * MIT, Copyright (c) 2026 AmiCradle Team. */
 #include "ogfx_leaves.h"
-#include "ac_magic.h"   /* a copy of amigachrome-guest common/amiga/ac_magic.h */
+#include "ac_magic.h"   /* a copy of amicradle-guest common/amiga/ac_magic.h */
 
 /* Bytes and longs a row at a time: a 68020 or 68040 takes four bytes in
  * one access once the pointer is even (the 68000 needs that too). The

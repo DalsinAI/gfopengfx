@@ -1,5 +1,5 @@
 /* oa_protos_begin.h and oa_protos_end.h: put around a module's proto includes.
- * A copy of amigachrome-guest's common/include/oa_protos_begin.h (W80).
+ * A copy of amicradle-guest's common/include/oa_protos_begin.h (W80).
  * Copyright (c) 2026 AmigaChrome Team. MIT licence (see LICENSE at the repository root).
  *
  *   #include "<path>/include/oa_protos_begin.h"

@@ -8,12 +8,12 @@ The plan was a fork first, merged once the GFOpenGfx work's testing was done. Th
 
 | | |
 | --- | --- |
-| Repository | `DalsinAI/amigachrome-guest` |
+| Repository | `DalsinAI/amicradle-guest` |
 | Path | `libraries/opengfx` (and `tests/m68k` for the tests, `common/amiga/ac_magic.h` for the tag) |
 | Commit | `90aa66f` (#35): gfopengfx.library 1.1, all eight graphics.library drawing and text patches; Chip RAM fills wait for the blitter |
 | Changes there since | none (`git log 90aa66f..origin/main -- libraries/opengfx` is empty on 8 October 2026) |
 
-The old library is kept in amigachrome-guest, archived in place (`libraries/opengfx/library/opengfx_lib.c`) and never deleted. In its place `gfopengfx.library` 1.2 is a stub that sends its six calls to gfopengpu.library (see "Compatibility" below).
+The old library is kept in amicradle-guest, archived in place (`libraries/opengfx/library/opengfx_lib.c`) and never deleted. In its place `gfopengfx.library` 1.2 is a stub that sends its six calls to gfopengpu.library (see "Compatibility" below).
 
 ## What came across, and what changed
 
@@ -56,7 +56,7 @@ The old library is kept in amigachrome-guest, archived in place (`libraries/open
 
 ## Compatibility
 
-- **`gfopengfx.library` 1.2, the stub** (amigachrome-guest `libraries/opengfx/stub`, 1.7 KB): opening it opens gfopengpu.library; each of its six calls jumps to the same LVO there. With no gfopengpu.library, or one older than 0.6, opening it fails, as when it is not installed, so programs fall back as they always have.
+- **`gfopengfx.library` 1.2, the stub** (amicradle-guest `libraries/opengfx/stub`, 1.7 KB): opening it opens gfopengpu.library; each of its six calls jumps to the same LVO there. With no gfopengpu.library, or one older than 0.6, opening it fails, as when it is not installed, so programs fall back as they always have.
 - **Why a stub, not an assign or a second copy:** a program or provider built for gfopengfx.library keeps its base and its calls; there is one set of patches and one provider slot, in gfopengpu.library, however a program got there; and the stub has nothing to keep in step.
 - **GFOpenUp and GFOpenPrefs** open neither gfopengfx.library nor GFOpenGfx today (`tools/build_pack.py` ships gfopengpu.library and gfopenrtg.library in the GFOpenRTG part, and GFOpenPrefs has no GFOpenGfx setting), so they need no change. The GFOpenRTG part picks GFOpenGfx up with the next gfopenrtg.library and gfopengpu.library.
 

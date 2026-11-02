@@ -1,6 +1,6 @@
 # graphics.library's jump table, as GFOpenGfx builds it: LVO, call, registers.
 # Written from the NDK 3.2 graphics_lib.fd's published order; build-amiga.sh
-# checks it against the stove's graphics_lib.fd (amigachrome-guest
+# checks it against the stove's graphics_lib.fd (amicradle-guest
 # libraries/common/check_fd.py) and check_regs.py checks every area's
 # gfx_lvo_<Call> entry against it. OWNERS.md says who writes each.
 -30 BltBitMap a0,d0,d1,a1,d2,d3,d4,d5,d6,d7,a2

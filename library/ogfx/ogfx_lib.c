@@ -3,7 +3,7 @@
  *
  * GFOpenGfx inside gfopengpu.library: graphics.library's drawing and text.
  *
- * This is gfopengfx.library 1.1 (amigachrome-guest libraries/opengfx, commit
+ * This is gfopengfx.library 1.1 (amicradle-guest libraries/opengfx, commit
  * 90aa66f), brought into gfopengpu.library on 8 October 2026 so one library
  * does all the drawing (FORK.md records what changed on the way).
  *
@@ -43,7 +43,7 @@
 
 #define REG OGFX_REG
 
-/* Zorro manufacturer of AmiCradle's own boards (amigachrome-guest
+/* Zorro manufacturer of AmiCradle's own boards (amicradle-guest
  * common/protocol/amigachrome_zorro.h). The old id, 2011, is shared with UAE and
  * home-made boards, so it is not taken as proof. */
 #define OGFX_AMICRADLE_MANUFACTURER 0xDA15
