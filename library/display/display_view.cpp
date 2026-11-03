@@ -184,23 +184,29 @@ uint32_t vp_layout(gfx_env *env, gd_view *view, gd_viewport *vp, layout &L)
     /* The bitplane fetch. At 1x each plane's word takes a bus cycle, so an
      * 8 colour clock fetch cycle shows lores 6 planes (8 on AGA), hires 4
      * and superhires 2. AGA's wider fetch (FMODE bits 0-1) takes 2 or 4
-     * words a cycle: hires at 2x and superhires at 4x show 8 planes, still
-     * in 8 colour clock cycles. The narrowest fetch that shows the planes
-     * is used, so whatever showed at 1x is made as before. A wider fetch
-     * needs its bitmap's planes and rows on 32 (2x) or 64 (4x) bits, as
-     * AllocBitMap gives displayable bitmaps on AGA. */
-    int fw = 1;                                     /* words of a plane a fetch */
+     * words a cycle: hires at 2x and superhires at 4x show 8 planes. A
+     * wider fetch needs its bitmap's planes and rows on 32 (2x) or 64 (4x)
+     * bits, as AllocBitMap gives displayable bitmaps on AGA. AGA uses the
+     * widest fetch the bitmaps allow, which leaves the most chip bus cycles
+     * to the CPU and the blitter; a narrower one (down to the narrowest
+     * that shows the planes) when the wider one would start before 0x18
+     * (below). */
+    int need = 1;                                   /* the narrowest fetch that shows the planes */
     if (L.depth > (shres ? 2 : hires ? 4 : isaga ? 8 : 6)) {
         if (!isaga || L.depth > 8) return GD_MVP_NO_DISPLAY;
-        fw = hires ? 2 : 4;
+        need = hires ? 2 : 4;
+    }
+    int fw = 1;                                     /* words of a plane a fetch */
+    if (isaga) {
+        uintptr_t a = 0;
         for (int i = 0; i < L.npf; i++) {
             const gfx_bitmap *bm = L.pf[i].bm;
-            uintptr_t a = bm->bytesperrow;
+            a |= bm->bytesperrow;
             for (int k = 0; k < L.pf[i].depth; k++) a |= reinterpret_cast<uintptr_t>(bm->planes[k]);
-            if (a & static_cast<uintptr_t>(2 * fw - 1)) return GD_MVP_NO_DISPLAY;
         }
+        fw = (a & 7) == 0 ? 4 : (a & 3) == 0 ? 2 : 1;
     }
-    L.fmode = static_cast<uint16_t>(fw - 1);
+    if (fw < need) return GD_MVP_NO_DISPLAY;
 
     /* BPLCON0..4 */
     const bool vlace = view && (view->modes & GD_LACE);
@@ -295,47 +301,64 @@ uint32_t vp_layout(gfx_env *env, gd_view *view, gd_viewport *vp, layout &L)
     if (xlo >= xhi || w <= 0 || h <= 0) L.visible[0] = L.visible[1] = false;
     if (!L.visible[0] && !L.visible[1]) return GD_MVP_OK;
     const int hstart = xlo / 4, hstop = (xhi + 3) / 4;
-    /* data starts at 2 * DDFSTRT + c: 17 in lores (HRM), 9 in hires and
-     * superhires at 1x (HRM), 17 at 2x and 4x, whose planes come in a whole
-     * 8 clock cycle (so AGA's hires screens fetch from 0x38 for 0x81) */
-    const int c = fw == 1 && (hires || shres) ? 9 : 17;
-    /* DDFSTRT's step: a fetch of each plane at 1x (4 clocks in superhires,
-     * DDFSTRT's finest), the 8 clock cycle when wider */
-    const int gran = fw == 1 && (hires || shres) ? 4 : 8;
-    const int blk = 16 * fw * p;                    /* one fetch of a plane, in 35ns pixels */
-    /* each playfield's stream: where its fetches start on the line, the
-     * last such place at or left of the window; the fetch starts at the
-     * last DDFSTRT at or left of them all, the rest is BPLCON1's delay */
-    int S[2];
-    int smin = 1 << 30;
-    for (int i = 0; i < L.npf; i++) {
-        const gd_rasinfo *r = i ? ri->next : ri;
-        int rx = r->rxoffset;
-        if (!isaga) rx &= ~(res - 1);               /* OCS/ECS scroll in lores pixels */
-        int col0 = vx0 - p * rx;                    /* where the bitmap's column 0 would be */
-        S[i] = 4 * hstart - floormod(4 * hstart - col0, blk);
-        L.pf[i].w0 = (S[i] - col0) / blk * fw;
-        smin = imin(smin, S[i]);
-    }
-    L.ddfstrt = floordiv(smin - 4 * c, 8 * gran) * gran;
-    const int base0 = 4 * (2 * L.ddfstrt + c);
-    for (int i = 0; i < L.npf; i++) {
-        int d = S[i] - base0;
-        while (d >= blk) {                          /* the fetch starts earlier: the other playfield's, or 8 clocks */
-            d -= blk;
-            L.pf[i].w0 -= fw;
-        }
-        L.pf[i].delay = d;
-    }
-    int words = (floordiv(4 * hstop - 1 - base0, blk) + 1) * fw;
-    /* words per plane in an 8 clock cycle, at any fetch used here; DDFSTOP
-     * is the last cycle's start */
+    /* words of a plane in 8 colour clocks, whatever the fetch */
     const int per8 = shres ? 4 : hires ? 2 : 1;
-    words = (words + per8 - 1) / per8 * per8;
-    while (words > per8 && L.ddfstrt + 8 * (words / per8 - 1) > 0xD8) words -= per8;
-    L.words = words;
-    L.ddfstop = L.ddfstrt + 8 * (words / per8 - 1);
-    for (int i = 0; i < L.npf; i++) L.pf[i].mod = L.pf[i].bm->bytesperrow * L.step - 2 * words;
+    for (;; fw >>= 1) {
+        /* data starts at 2 * DDFSTRT + c: 17 in lores (HRM), 9 in hires and
+         * superhires at 1x (HRM), 17 at 2x and 4x, whose planes come in a
+         * whole cycle (so AGA's hires screens fetch from 0x38 for 0x81) */
+        const int c = fw == 1 && (hires || shres) ? 9 : 17;
+        /* DDFSTRT's step: a fetch of each plane at 1x (4 clocks in
+         * superhires, DDFSTRT's finest), 8 clocks when wider */
+        const int gran = fw == 1 && (hires || shres) ? 4 : 8;
+        const int blk = 16 * fw * p;                /* one fetch of a plane, in 35ns pixels */
+        /* the fetch cycle: wpc words of each plane in u colour clocks; 8,
+         * but lores at 2x 16 and at 4x 32, hires at 4x 16 */
+        const int wpc = imax(fw, per8), u = 8 * wpc / per8;
+        /* each playfield's stream: where its fetches start on the line, the
+         * last such place at or left of the window; the fetch starts at the
+         * last DDFSTRT at or left of them all, the rest is BPLCON1's delay */
+        int S[2];
+        int smin = 1 << 30;
+        for (int i = 0; i < L.npf; i++) {
+            const gd_rasinfo *r = i ? ri->next : ri;
+            int rx = r->rxoffset;
+            if (!isaga) rx &= ~(res - 1);           /* OCS/ECS scroll in lores pixels */
+            int col0 = vx0 - p * rx;                /* where the bitmap's column 0 would be */
+            S[i] = 4 * hstart - floormod(4 * hstart - col0, blk);
+            L.pf[i].w0 = (S[i] - col0) / blk * fw;
+            smin = imin(smin, S[i]);
+        }
+        L.ddfstrt = floordiv(smin - 4 * c, 8 * gran) * gran;
+        const int base0 = 4 * (2 * L.ddfstrt + c);
+        for (int i = 0; i < L.npf; i++) {
+            int d = S[i] - base0;
+            while (d >= blk) {                      /* the fetch starts earlier: the other playfield's, or 8 clocks */
+                d -= blk;
+                L.pf[i].w0 -= fw;
+            }
+            L.pf[i].delay = d;
+        }
+        /* n cycles cover the window. DDFSTOP: at 8 clocks the last cycle's
+         * start (HRM); at 16 and 32 the fetch runs to the end of the cycle
+         * DDFSTOP falls in and one cycle more, so DDFSTOP is 8 clocks into
+         * the last but one (a 320 pixel lores screen at 4x: 0x38-0xA0),
+         * and there are at least 2. DDFSTOP stays at 0xD8 or before (a
+         * wider fetch reaches as far right as a narrower one) */
+        const int words = floordiv(4 * hstop - 1 - base0, blk) * fw + fw;
+        const int nmin = u > 8 ? 2 : 1;
+        int n = imax((words + wpc - 1) / wpc, nmin);
+        auto stop = [&](int k) { return L.ddfstrt + (u > 8 ? u * (k - 2) + 8 : 8 * (k - 1)); };
+        while (n > nmin && stop(n) > 0xD8) n--;
+        /* a wider fetch that would start before 0x18 (the HRM's first
+         * DDFSTRT): a narrower one */
+        if (L.ddfstrt < 0x18 && fw > need) continue;
+        L.words = n * wpc;
+        L.ddfstop = stop(n);
+        break;
+    }
+    L.fmode = static_cast<uint16_t>(fw - 1);
+    for (int i = 0; i < L.npf; i++) L.pf[i].mod = L.pf[i].bm->bytesperrow * L.step - 2 * L.words;
     auto enc = [isaga](int d, int sh) -> uint16_t {
         if (!isaga) return static_cast<uint16_t>(((d >> 2) & 15) << sh);
         return static_cast<uint16_t>((((d >> 2) & 15) << sh) | ((d & 3) << (sh + 8)) | (((d >> 6) & 3) << (sh + 10)));
