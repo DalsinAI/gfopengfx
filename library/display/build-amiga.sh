@@ -28,3 +28,7 @@ echo "$OUT/tests/DisplayABITest ($(wc -c < "$OUT/tests/DisplayABITest") bytes)"
 "$CC" $LATE -m68040 -specs="$TOP/build/m68k-soft-m68040.specs" -O2 -Wall -Wextra -Werror -Wno-pointer-sign -Wno-format -noixemul \
   -o "$OUT/tests/ScreenDepthProbe" "$TOP/tests/ScreenDepthProbe.c"
 echo "$OUT/tests/ScreenDepthProbe ($(wc -c < "$OUT/tests/ScreenDepthProbe") bytes)"
+# MonitorProbe: the running ROM's monitors, display database and a mode's copper list (its header says what it prints)
+"$CC" $LATE -m68040 -specs="$TOP/build/m68k-soft-m68040.specs" -O2 -Wall -Wextra -Werror -Wno-pointer-sign -Wno-format -noixemul \
+  -o "$OUT/tests/MonitorProbe" "$TOP/tests/MonitorProbe.c"
+echo "$OUT/tests/MonitorProbe ($(wc -c < "$OUT/tests/MonitorProbe") bytes)"

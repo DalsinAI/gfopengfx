@@ -15,7 +15,11 @@ struct assoc {                          /* GfxAssociate's pairs */
     const void *key;
     gd_extnode *node;
 };
-enum { NHASH = 32, NMONITORS = 3, NKEYS = 30, NMODES = NMONITORS * NKEYS };
+/* Six monitors: default, NTSC and PAL, built in; Multiscan, DblNTSC and
+ * DblPAL, whose modes are there while their driver's MonitorSpec is on
+ * GfxBase->MonitorList (display_db.cpp). Each has the native keys its
+ * driver has: the built-in ones 30, DblNTSC and DblPAL 16, Multiscan 24. */
+enum { NHASH = 32, NMONITORS = 6, NBUILTIN = 3, NKEYS = 30, NMODES = 3 * 30 + 2 * 16 + 24 };
 /* GfxBase's semaphore pointers, each to one of state::sems. Programs outside
  * graphics take them (a monitor driver run by LoadMonDrvs takes
  * MonitorListSemaphore before it adds its MonitorSpec), so none may be NULL:
@@ -26,7 +30,7 @@ enum { SEM_LASTCHANCE, SEM_ACTIVIEWCPR, SEM_MONITORLIST, SEM_HASHTABLE, NSEMS };
 struct state {
     gd_copinit *copinit;                /* chip RAM; also GfxBase->copinit */
     gd_simplesprite *sprites[8];        /* GfxBase->SimpleSprites */
-    gd_monitorspec *monitors[NMONITORS]; /* default, ntsc, pal */
+    gd_monitorspec *monitors[NBUILTIN]; /* default, ntsc, pal */
     assoc *hash[NHASH];                 /* GfxBase->hash_table */
     uint32_t modeids[NMODES];           /* DisplayInfoHandles point here */
     uint16_t fmode;                     /* what copinit loads into FMODE */
@@ -84,7 +88,15 @@ struct geom {
     int total_rows;                     /* lines a field shows: 0 .. total_rows-1 */
     int min_row;                        /* the first line bitplanes can show */
     bool pal;
+    int scan;                           /* SCAN_: how its modes use the chips */
 };
+/* A 31 kHz monitor's modes (OS 3.2.3's copper lists, measured): every line
+ * progressive, a ViewPort's LACE meaning one row a line ("No Flicker") and
+ * no LACE each row shown on two lines (FMODE's BSCAN2); sprites scan doubled
+ * (SSCAN2). DblNTSC's and DblPAL's bitplanes run a resolution faster than
+ * the mode says (Low Res on hires bitplanes); Multiscan's as it says. */
+enum { SCAN_NONE, SCAN_DBL, SCAN_MULTI };
+int scan_of(const gd_monitorspec *ms);
 geom view_geom(gfx_env *env, gd_view *view);
 gd_monitorspec *monitor_of_view(gfx_env *env, gd_view *view);
 

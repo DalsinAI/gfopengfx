@@ -7,8 +7,9 @@
  * with BPLCON1's scroll, HAM6, HAM8, EHB, dual playfield, AGA's palette
  * banks, LOCT, PF2OF and BPLAM, in lores, hires and superhires, with AGA's
  * wider fetches (FMODE bits 0-1). A line fetched against the chips' rules
- * (more planes than its fetch shows, a DDFSTOP off the fetch's cycle, a
- * pointer or modulo off a wider fetch's width) is counted as a failure.
+ * (more planes than its fetch shows, a DDFSTRT before 0x18, a DDFSTOP off
+ * the fetch's cycle, a pointer or modulo off a wider fetch's width) is
+ * counted as a failure.
  * The registers a line uses are taken at colour clock 0x20, before any
  * fetch. The frame is kept in 35ns (superhires) pixels; what it shows is
  * hashed over each ViewPort's rectangle and compared with model.py's
@@ -94,6 +95,7 @@ struct machine {
     bool lof;
     uint16_t beamcon0;
     bool beamset;
+    bool diwhigh;                       /* DIWHIGH written since DIWSTRT or DIWSTOP (ECS, AGA) */
     int cpu_t;                          /* the beam the CPU sees, in colour clocks */
     int denise_toggle;
     int copper_errors;
@@ -115,6 +117,8 @@ static void sim_write(uint32_t r, uint16_t v, bool copper, uint32_t *pc)
     case GD_COPJMP1: if (copper) *pc = M.cop1lc; return;
     case GD_COPJMP2: if (copper) *pc = M.cop2lc; return;
     case GD_BEAMCON0: M.beamcon0 = v; M.beamset = M.chip > 0; return;
+    case GD_DIWSTRT: case GD_DIWSTOP: M.diwhigh = false; return;
+    case GD_DIWHIGH: M.diwhigh = M.chip > 0; return;
     }
     if (r >= GD_BPL1PTH && r < GD_BPL1PTH + 32) {
         int k = (r - GD_BPL1PTH) >> 2;
@@ -185,14 +189,23 @@ static void render_line(int v)
     int planes = (con0 >> 12) & 7;
     if (aga && (con0 & 0x10)) planes = 8;
     if (planes > 6 && !aga) planes = 6;
-    uint16_t ds = M.reg[GD_DIWSTRT >> 1], de = M.reg[GD_DIWSTOP >> 1];
+    /* the window: with DIWHIGH its bits 8-10; else V8 of the start 0, of
+     * the stop not V7, H8 of the start 0 and of the stop 1 (HRM) */
+    uint16_t ds = M.reg[GD_DIWSTRT >> 1], de = M.reg[GD_DIWSTOP >> 1], dh = M.reg[GD_DIWHIGH >> 1];
     int vstart = ds >> 8, vs = de >> 8, vstop = (vs & 0x80) ? vs : vs | 0x100;
+    int hstart = ds & 0xFF, hstop = (de & 0xFF) | 0x100;
+    if (M.diwhigh) {
+        vstart |= (dh & 7) << 8;
+        vstop = vs | (dh >> 8 & 7) << 8;
+        hstart |= (dh >> 5 & 1) << 8;
+        hstop = (de & 0xFF) | (dh >> 13 & 1) << 8;
+    }
     if (!(planes > 0 && v >= vstart && v < vstop)) return;
     /* the resolution and the fetch (AGA's FMODE bits 0-1: 1x, 2x, 2x, 4x).
      * The planes a fetch shows, and the colour clocks of DDFSTOP's cycle:
-     * 8 at 1x, and at 2x and 4x for hires and superhires; lores at 2x and
-     * 4x is 16 and 32 (the runtime's rule: the cycle DDFSTOP falls in and
-     * one more). Data shows from 2 * DDFSTRT + 17 lores pixels in lores,
+     * 8 at 1x, at 2x for hires and at 2x and 4x for superhires; lores at
+     * 2x and 4x is 16 and 32, hires at 4x 16 (the runtime's rule: the
+     * cycle DDFSTOP falls in and one more). Data shows from 2 * DDFSTRT + 17 lores pixels in lores,
      * + 9 in hires and superhires at 1x, + 17 at 2x and 4x. */
     const bool shres = M.chip > 0 && (con0 & 0x40) != 0, hires = !shres && (con0 & 0x8000) != 0;
     const int res = shres ? 2 : hires ? 1 : 0;
@@ -202,7 +215,7 @@ static void render_line(int v)
     if (planes > ((aga && !fi && !res) ? 8 : maxp[fi][res])) misfetch++;
     const int u = unit[fi][res];
     int dstart = M.reg[GD_DDFSTRT >> 1] & (res || fi ? 0xFC : 0xF8), dstop = M.reg[GD_DDFSTOP >> 1] & 0xFC;
-    if (fi && (dstart & 7)) misfetch++;
+    if ((fi && (dstart & 7)) || dstart < 0x18) misfetch++;   /* the HRM's first DDFSTRT */
     int cycles = 0, x = dstop - dstart;
     if (x >= 0) {
         if (u == 8) {
@@ -229,7 +242,6 @@ static void render_line(int v)
         if (aga) delay[f] |= ((con1 >> (sh + 8)) & 3) | ((con1 >> (sh + 10)) & 3) << 6;
     }
     const int base = 4 * (2 * dstart + (res && !fi ? 9 : 17)), p = 4 >> res;
-    const int hstart = ds & 0xFF, hstop = (de & 0xFF) | 0x100;
     const bool ham = (con0 & 0x800) != 0, dpf = (con0 & 0x400) != 0;
     uint32_t hold = M.palette[0];
     int off2 = 8;
@@ -985,14 +997,17 @@ static void fetch_modes(int chip)
                 if (r != (ok ? GD_MVP_OK : GD_MVP_NO_DISPLAY))
                     printf("  chip %d %s%s depth %d: MakeVPort %lu\n", chip, rn[res], lace ? " laced" : "", depth, (unsigned long)r);
                 if (r == GD_MVP_OK) {
-                    /* at 1x: lores 0x38-0xD0, hires and superhires 0x3C-0xD4
-                     * (HRM); hires at 2x and superhires at 4x: 0x38-0xD0
-                     * (their data shows from 2 * DDFSTRT + 17); the modulo the
-                     * rows the fetch skips: 0, or a row when laced */
-                    int wide = (res == 1 && depth > 4) || (res == 2 && depth > 2);
+                    /* OCS and ECS at 1x: lores 0x38-0xD0, hires and
+                     * superhires 0x3C-0xD4 (HRM). AGA, the bitmap on 64 bits:
+                     * 4x, whose data shows from 2 * DDFSTRT + 17, so from
+                     * 0x38, to 0xD8 with the cycle at the window's right edge
+                     * as OS 3.2.3 (its PAL High Res: 0x38-0xD8, BPL1MOD -8).
+                     * The modulo the rows the fetch skips: 0 (-8 at 4x), and
+                     * a row when laced */
                     regs g = dsp_regs(&vp);
-                    uint16_t ws = (res && !wide) ? 0x3C : 0x38, we = (uint16_t)(ws + 0x98);
-                    uint16_t wm = (uint16_t)(lace ? rb : 0), wf = (uint16_t)(chip < 2 ? 0xEEEE : !wide ? 0 : res == 1 ? 1 : 3);
+                    uint16_t ws = (res && chip < 2) ? 0x3C : 0x38;
+                    uint16_t we = (uint16_t)(chip < 2 ? ws + 0x98 : 0xD8);
+                    uint16_t wm = (uint16_t)((lace ? rb : 0) - (chip < 2 ? 0 : 8)), wf = (uint16_t)(chip < 2 ? 0xEEEE : 3);
                     bool same = g.ddfstrt == ws && g.ddfstop == we && g.mod1 == wm && g.mod2 == wm && g.con1 == 0 && g.fmode == wf;
                     CHECK(same, "the fetch per resolution and depth");
                     if (!same)
@@ -1014,21 +1029,43 @@ static void fetch_modes(int chip)
         vp.modes = GD_HIRES | GD_SUPERHIRES;
         CHECK(gd_MakeVPort(&E, &v, &vp) == GD_MVP_OK, "SysInfo's screen");
         regs g = dsp_regs(&vp);
-        CHECK(g.ddfstrt == 0x38 && g.ddfstop == 0x80 && g.mod1 == 0 && g.mod2 == 0 && g.fmode == 3, "SysInfo's screen: 4x, 0x38-0x80");
-        /* hires, 8 planes, scrolled 5 pixels: the fetch a cycle earlier,
-         * 54 superhires pixels of delay (PF1H 13 and PF1H0-1 2), 42 words */
+        CHECK(g.ddfstrt == 0x38 && g.ddfstop == 0x88 && g.mod1 == 0xFFF8 && g.mod2 == 0xFFF8 && g.fmode == 3, "SysInfo's screen: 4x, 0x38-0x88");
+        /* hires, 8 planes, scrolled 5 pixels: 4x, the fetch a 16 clock
+         * cycle earlier (0x18 + 16n), 118 superhires pixels of delay (PF1H
+         * 13, PF1H0-1 2, PF1H6-7 1), 12 cycles of 4 words */
         ri.bitmap = plain_bm(8, 80, 32, 0);
         ri.rxoffset = 5;
         vp.modes = GD_HIRES;
         CHECK(gd_MakeVPort(&E, &v, &vp) == GD_MVP_OK, "hires 8 planes scrolled");
         g = dsp_regs(&vp);
-        CHECK(g.ddfstrt == 0x30 && g.ddfstop == 0xD0 && g.mod1 == 0xFFFC && g.con1 == 0x22DD && g.fmode == 1, "hires 8 planes scrolled: 0x30-0xD0, BPLCON1 0x22DD");
+        CHECK(g.ddfstrt == 0x28 && g.ddfstop == 0xD8 && g.mod1 == 0xFFF0 && g.con1 == 0x66DD && g.fmode == 3, "hires 8 planes scrolled: 4x, 0x28-0xD8, BPLCON1 0x66DD");
         ri.rxoffset = 0;
+        /* lores, the bitmap on 32 bits: 2x, 11 cycles of 16 clocks */
+        ri.bitmap = plain_bm(4, 44, 32, 4);
+        vp.modes = 0;
+        vp.dwidth = 320;
+        CHECK(gd_MakeVPort(&E, &v, &vp) == GD_MVP_OK, "lores on 32 bits");
+        g = dsp_regs(&vp);
+        CHECK(g.ddfstrt == 0x38 && g.ddfstop == 0xD8 && g.mod1 == 0 && g.fmode == 1, "lores on 32 bits: 2x, 0x38-0xD8");
+        /* lores at the left edge (0x51) scrolled 60 pixels: 4x and 2x would
+         * start before 0x18, so 1x from 0x18 */
+        ri.bitmap = plain_bm(4, 64, 32, 0);
+        ri.rxoffset = 60;
+        vp.dxoffset = 0x51 - 0x81;
+        CHECK(gd_MakeVPort(&E, &v, &vp) == GD_MVP_OK, "lores scrolled at the left edge");
+        g = dsp_regs(&vp);
+        CHECK(g.ddfstrt == 0x18 && g.fmode == 0, "lores scrolled at the left edge: 1x from 0x18");
+        ri.rxoffset = 0;
+        CHECK(gd_MakeVPort(&E, &v, &vp) == GD_MVP_OK && dsp_regs(&vp).fmode == 3 && dsp_regs(&vp).ddfstrt == 0x18,
+              "lores at the left edge: 4x from 0x18");
+        vp.dxoffset = 0;
+        vp.dwidth = 640;
+        vp.modes = GD_HIRES;
         /* a wider fetch needs its planes and rows on its width */
         ri.bitmap = plain_bm(8, 82, 32, 0);
         CHECK(gd_MakeVPort(&E, &v, &vp) == GD_MVP_NO_DISPLAY, "hires 8 planes, rows of 82 bytes: no 2x");
         ri.bitmap = plain_bm(8, 84, 32, 0);
-        CHECK(gd_MakeVPort(&E, &v, &vp) == GD_MVP_OK && dsp_regs(&vp).mod1 == 4, "hires 8 planes, rows of 84 bytes: 2x");
+        CHECK(gd_MakeVPort(&E, &v, &vp) == GD_MVP_OK && dsp_regs(&vp).mod1 == 0, "hires 8 planes, rows of 84 bytes: 2x, 21 cycles");
         ri.bitmap = plain_bm(8, 80, 32, 2);
         CHECK(gd_MakeVPort(&E, &v, &vp) == GD_MVP_NO_DISPLAY, "hires 8 planes off 32 bits: no 2x");
         ri.bitmap = plain_bm(3, 84, 32, 0);
@@ -1045,7 +1082,7 @@ static void fetch_modes(int chip)
         CHECK(gd_MakeVPort(&E, &v, &vp) == GD_MVP_OK && gd_MrgCop(&E, &v) == GD_MCOP_OK, "a hires 8 plane View");
         gd_LoadView(&E, &v);
         frame(true);
-        CHECK(M.reg[GD_FMODE >> 1] == 0x0001, "the View's FMODE: 2x, 16 pixel sprites");
+        CHECK(M.reg[GD_FMODE >> 1] == 0x0003, "the View's FMODE: 4x, 16 pixel sprites");
         gfx_bitmap sb;
         memset(&sb, 0, sizeof sb);
         static uint8_t sp0[8], sp1[8];
@@ -1055,7 +1092,7 @@ static void fetch_modes(int chip)
         CHECK(e1 && e2 && gd_GetExtSpriteA(&E, e1, g0) == 0, "GetExtSpriteA 0");
         CHECK(gd_ChangeExtSpriteA(&E, &vp, e1, e2, 0) == 1, "a 32 pixel sprite");
         frame(true);
-        CHECK(M.reg[GD_FMODE >> 1] == 0x0005, "the View's FMODE: 2x, 32 pixel sprites");
+        CHECK(M.reg[GD_FMODE >> 1] == 0x0007, "the View's FMODE: 4x, 32 pixel sprites");
         gd_LoadView(&E, 0);
         gd_FreeSprite(&E, 0);
         gd_FreeSpriteData(&E, e1);
@@ -1146,6 +1183,189 @@ static void wide_sprites(int chip)
     printf("sprites chip %d done\n", chip);
 }
 
+/* Multiscan, DblNTSC and DblPAL as OS 3.2.3's drivers make them
+ * (tests/MonitorProbe.c on an OS 3.2.3 A1200, 3 November 2026): the
+ * drivers' MonitorSpecs and SpecialMonitors as display_os323_screens.txt
+ * has them, added to MonitorList as a driver does. Every mode's records are
+ * printed as MonitorProbe prints them, and test_gfx_display.sh compares
+ * them with display_os323_modes.txt, OS 3.2.3's own. MakeVPort's registers
+ * are compared with OS 3.2.3's copper lists for the same screens; LoadView
+ * of a driver's View calls its do_monitor once. */
+static int domon_calls;
+static gd_monitorspec *domon_ms;
+static int32_t fake_do_monitor(gd_monitorspec *ms) { domon_calls++; domon_ms = ms; return 0; }
+static void prect(const char *n, const gfx_rectangle &r) { printf(" %s %d,%d-%d,%d", n, r.minx, r.miny, r.maxx, r.maxy); }
+static void print_mode(uint32_t id)
+{
+    gd_displayinfo di;
+    gd_dimensioninfo dm;
+    gd_monitorinfo mi;
+    gd_nameinfo ni;
+    void *h = gd_FindDisplayInfo(&E, id);
+    if (!h) { printf("MODE %08lX not found\n", (unsigned long)id); return; }
+    printf("MODE %08lX na %lx", (unsigned long)id, (unsigned long)gd_ModeNotAvailable(&E, id));
+    if (gd_GetDisplayInfoData(&E, h, &di, sizeof di, GD_DTAG_DISP, 0))
+        printf(" rec %08lX props %08lX res %d,%d speed %d sprres %d,%d", (unsigned long)di.header.displayid,
+               (unsigned long)di.propertyflags, di.resolution.x, di.resolution.y, di.pixelspeed, di.spriteresolution.x,
+               di.spriteresolution.y);
+    if (gd_GetDisplayInfoData(&E, h, &dm, sizeof dm, GD_DTAG_DIMS, 0)) {
+        printf(" depth %d", dm.maxdepth);
+        prect("nom", dm.nominal); prect("max", dm.maxoscan); prect("video", dm.videooscan);
+        prect("txt", dm.txtoscan); prect("std", dm.stdoscan);
+    }
+    if (gd_GetDisplayInfoData(&E, h, &mi, sizeof mi, GD_DTAG_MNTR, 0)) {
+        printf(" rows %d cclks %d minrow %d pos %d,%d", mi.totalrows, mi.totalcolorclocks, mi.minrow, mi.viewposition.x,
+               mi.viewposition.y);
+        prect("posrange", mi.viewpositionrange);
+        printf(" vres %d,%d ticks %d,%d defpos %d,%d pref %08lX compat %d", mi.viewresolution.x, mi.viewresolution.y,
+               mi.mouseticks.x, mi.mouseticks.y, mi.defaultviewposition.x, mi.defaultviewposition.y,
+               (unsigned long)mi.preferredmodeid, mi.compatibility);
+    }
+    if (gd_GetDisplayInfoData(&E, h, &ni, sizeof ni, GD_DTAG_NAME, 0)) printf(" name \"%s\"", (char *)ni.name);
+    printf("\n");
+}
+struct drv { const char *name; int ratioh, ratiov, rows, cclks, dmax, dmin, minrow; uint16_t vb1, vs0, vs1; };
+static gd_monitorspec *add_driver(const drv &d)
+{
+    gd_monitorspec *ms = (gd_monitorspec *)gd_GfxNew(&E, GD_MONITOR_SPEC_TYPE);
+    gd_specialmonitor *sm = (gd_specialmonitor *)gd_GfxNew(&E, GD_SPECIAL_MONITOR_TYPE);
+    ms->n.node.name = (char *)d.name;
+    ms->flags = 0x0016;
+    ms->ratioh = d.ratioh; ms->ratiov = d.ratiov;
+    ms->total_rows = (uint16_t)d.rows; ms->total_colorclocks = (uint16_t)d.cclks;
+    ms->denisemaxdisplaycolumn = (uint16_t)d.dmax; ms->deniseminDisplaycolumn = (uint16_t)d.dmin;
+    ms->beamcon0 = 0x1B88; ms->min_row = (uint16_t)d.minrow; ms->xoffset = 9;
+    ms->special = sm;
+    sm->do_monitor = (void *)fake_do_monitor;
+    sm->hblank.start = 0x0001; sm->hblank.stop = 0x0021; sm->vblank.start = 0; sm->vblank.stop = d.vb1;
+    sm->hsync.start = 0x000B; sm->hsync.stop = 0x0015; sm->vsync.start = d.vs0; sm->vsync.stop = d.vs1;
+    nl(&ms->displayinfodatabase);
+    gfx_node *n = &ms->n.node;           /* AddTail, as the driver */
+    n->succ = (gfx_node *)&GB->monitorlist.tail; n->pred = GB->monitorlist.tailpred;
+    GB->monitorlist.tailpred->succ = n; GB->monitorlist.tailpred = n;
+    return ms;
+}
+static void remove_driver(gd_monitorspec *ms)
+{
+    ms->n.node.pred->succ = ms->n.node.succ;
+    ms->n.node.succ->pred = ms->n.node.pred;
+    gd_GfxFree(&E, &ms->special->n);
+    gd_GfxFree(&E, &ms->n);
+}
+/* one screen as OS 3.2.3 opened it (display_os323_screens.txt): its
+ * View's place and monitor, its ViewPort, and the registers its list sets */
+struct scr { int mon; int vx, vy, vmodes, w, h, modes, rb; uint16_t diwstrt, diwstop, diwhigh, ddfstrt, ddfstop, con1, mod1, mod2, fmode, con0, con3; };
+static void monitors31()
+{
+    tused = 0;
+    boot(2, true);
+    int n = 0;
+    for (uint32_t id = GD_INVALID_ID; (id = gd_NextDisplayInfo(&E, id)) != GD_INVALID_ID;) n++;
+    CHECK(n == 90 && !gd_FindDisplayInfo(&E, 0x000A1000) && gd_ModeNotAvailable(&E, 0x000A9004) == GD_DI_AVAIL_NOMONITOR
+          && !gd_OpenMonitor(&E, 0, 0x000A1000), "no driver: no DblPAL");
+    static const drv drivers[3] = { { "multiscan.monitor", 8, 29, 505, 121, 245, 65, 25, 0x0BD1, 0x03C8, 0x0790 },
+                                    { "DblNTSC.monitor", 9, 28, 477, 129, 261, 65, 23, 0x0B97, 0x0387, 0x070E },
+                                    { "DblPAL.monitor", 9, 28, 573, 129, 261, 65, 23, 0x0B97, 0x0387, 0x070E } };
+    gd_monitorspec *ms[3];
+    for (int i = 0; i < 3; i++) ms[i] = add_driver(drivers[i]);
+    n = 0;
+    for (uint32_t id = GD_INVALID_ID; (id = gd_NextDisplayInfo(&E, id)) != GD_INVALID_ID;) {
+        n++;
+        if (id >= 0x00031000) print_mode(id);
+    }
+    CHECK(n == 90 + 16 + 16 + 24, "the drivers' modes: Multiscan 24, DblNTSC and DblPAL 16 each");
+    CHECK(gd_OpenMonitor(&E, 0, 0x000A9004) == ms[2] && gd_CloseMonitor(&E, ms[2]) == 0, "OpenMonitor of DblPAL: the driver's");
+    /* MakeVPort against OS 3.2.3's lists: depth 2, 64-bit bitmaps */
+    static const scr screens[6] = {
+        { 2, 91, 42, 0, 640, 512, 0xD004, 80, 0x2A5B, 0x2AFB, 0x0200, 0x20, 0x70, 0x00AA, 0xFFF8, 0xFFF8, 0x8003, 0x2241, 0x0C81 },
+        { 2, 91, 42, 0, 320, 256, 0x5000, 40, 0x2A5B, 0x2AFB, 0x0200, 0x18, 0x68, 0x44AA, 0xFFD0, 0xFFF8, 0xC003, 0xA201, 0x0C81 },
+        { 0, 83, 25, 0, 640, 480, 0xD024, 80, 0x1953, 0xF9F3, 0x0100, 0x20, 0x70, 0x0022, 0xFFF8, 0xFFF8, 0x8003, 0x2241, 0x0C81 },
+        { 1, 91, 50, 0, 640, 400, 0xD004, 80, 0x325B, 0xC2FB, 0x0100, 0x20, 0x70, 0x00AA, 0xFFF8, 0xFFF8, 0x8003, 0x2241, 0x0C81 },
+        /* PAL High Res Laced and High Res; OS 3.2.3's BPLCON0 has no
+         * ECSENA here (ours has, on ECS and AGA) and its BPLCON3 lores
+         * sprites (0x0C40; ours ECS's default), so neither is compared */
+        { -1, 129, 44, GD_LACE, 640, 512, 0xD004, 80, 0x2C81, 0x2CC1, 0x2100, 0x38, 0xD8, 0x0000, 0x0048, 0x0048, 0x0003, 0xA204, 0 },
+        { -1, 129, 44, 0, 640, 256, 0xD000, 80, 0x2C81, 0x2CC1, 0x2100, 0x38, 0xD8, 0x0000, 0xFFF8, 0xFFF8, 0x0003, 0xA200, 0 },
+    };
+    for (int i = 0; i < 6; i++) {
+        const scr &S = screens[i];
+        gd_view v;
+        gd_InitView(&E, &v);
+        v.dxoffset = (int16_t)S.vx; v.dyoffset = (int16_t)S.vy; v.modes = (uint16_t)S.vmodes;
+        gd_viewextra *ve = (gd_viewextra *)gd_GfxNew(&E, GD_VIEW_EXTRA_TYPE);
+        ve->monitor = S.mon >= 0 ? ms[S.mon] : gd_OpenMonitor(&E, "pal.monitor", 0);
+        gd_GfxAssociate(&E, &v, &ve->n);
+        v.modes |= GD_EXTEND_VSTRUCT;
+        gd_rasinfo ri;
+        memset(&ri, 0, sizeof ri);
+        ri.bitmap = plain_bm(2, S.rb, S.h, 0);
+        gfx_colormap cm;
+        memset(&cm, 0, sizeof cm);
+        cm.type = GFX_COLORMAP_TYPE_V39;
+        cm.vpmodeid = GD_INVALID_ID;
+        cm.spritebase_even = cm.spritebase_odd = 16;
+        cm.bp_1_base = 8;
+        cm.spriteresolution = 0xFF;
+        gd_viewport vp;
+        gd_InitVPort(&E, &vp);
+        vp.rasinfo = &ri; vp.colormap = &cm; cm.vp = &vp;
+        vp.dwidth = (int16_t)S.w; vp.dheight = (int16_t)S.h; vp.modes = (uint16_t)S.modes;
+        CHECK(gd_MakeVPort(&E, &v, &vp) == GD_MVP_OK, "MakeVPort of OS 3.2.3's screen");
+        uint16_t got[13];
+        memset(got, 0, sizeof got);
+        static const uint16_t regs13[13] = { GD_DIWSTRT, GD_DIWSTOP, GD_DIWHIGH, GD_DDFSTRT, GD_DDFSTOP, GD_BPLCON1,
+                                             GD_BPL1MOD, GD_BPL2MOD, GD_FMODE, GD_BPLCON0, GD_BPLCON3, 0, 0 };
+        const gd_coplist *cl = vp.dspins;
+        int blocks = 0;
+        for (int k = 0; cl && k < cl->count; k++) {
+            const gd_copins &ci = cl->copins[k];
+            if ((ci.opcode & 3) == GD_COPPER_WAIT) { blocks++; continue; }
+            for (int r = 0; r < 11; r++)
+                if ((ci.u.w.a & 0x1FE) == regs13[r]) {
+                    /* BPLCON0 with its planes (the second block), BPLCON3 its
+                     * first (no colour bank) */
+                    if (r == 9 && blocks != 2) continue;
+                    if (r == 10 && got[10]) continue;
+                    got[r] = (uint16_t)ci.u.w.b;
+                }
+        }
+        uint16_t want[11] = { S.diwstrt, S.diwstop, S.diwhigh, S.ddfstrt, S.ddfstop, S.con1, S.mod1, S.mod2, S.fmode, S.con0, S.con3 };
+        if (S.mon < 0) { got[9] &= (uint16_t)~1; got[10] = 0; }
+        bool same = !memcmp(got, want, sizeof want);
+        CHECK(same, "MakeVPort's registers: OS 3.2.3's for the same screen");
+        if (!same) {
+            printf("  screen %d:", i);
+            for (int r = 0; r < 11; r++) printf(" %03x=%04x/%04x", regs13[r], got[r], want[r]);
+            printf("\n");
+        }
+        if (i == 0) {
+            /* a View on it: MrgCop crosses line 255 and line 511 (its window
+             * ends at line 554); LoadView calls the driver's do_monitor once */
+            v.viewport = &vp;
+            CHECK(gd_MrgCop(&E, &v) == GD_MCOP_OK, "MrgCop on DblPAL");
+            int wraps = 0;
+            for (const uint16_t *c = v.lofcprlist->start; !(c[0] == 0xFFFF && c[1] == 0xFFFE); c += 2)
+                if (c[0] == 0xFFDF && c[1] == 0xFFFE) wraps++;
+            CHECK(wraps == 2, "the list waits through lines 255 and 511");
+            domon_calls = 0;
+            gd_LoadView(&E, &v);
+            gd_LoadView(&E, &v);
+            CHECK(domon_calls == 1 && domon_ms == ms[2] && GB->current_monitor == ms[2] && GB->current_tot_rows == 573,
+                  "LoadView: the driver's do_monitor, once");
+            gd_LoadView(&E, 0);
+            CHECK(M.beamcon0 == 0x0020 && GB->current_monitor == GB->default_monitor, "back to the default monitor's beam");
+            gd_FreeCprList(&E, v.lofcprlist);
+        }
+        gd_FreeVPortCopLists(&E, &vp);
+        if (S.mon < 0) gd_CloseMonitor(&E, ve->monitor);
+        gd_GfxFree(&E, &ve->n);
+    }
+    for (int i = 0; i < 3; i++) remove_driver(ms[i]);
+    CHECK(!gd_FindDisplayInfo(&E, 0x00039024), "the driver gone: its modes gone");
+    shutdown();
+    printf("monitors done\n");
+}
+
 /* gfopengfx.library next to OS 3.2's graphics.library: the same calls, no
  * custom chip register written */
 static void side_by_side()
@@ -1172,6 +1392,7 @@ int main(void)
         for (int p = 0; p < 2; p++) misc(c, p != 0);
     for (int c = 0; c < 3; c++) fetch_modes(c);
     for (int c = 0; c < 3; c++) wide_sprites(c);
+    monitors31();
     side_by_side();
     printf("%lu checks, %lu failed\n", checks, fails);
     return fails != 0;

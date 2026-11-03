@@ -11,10 +11,15 @@
  * from Kickstart's code. Lean C++: no Amiga headers, no globals; the
  * tables are constants.
  *
- * The database is ours: three monitors (default, NTSC, PAL) times the 30
- * native keys of modeid.h, each with its NotAvailable from the chips.
- * DEVS:Monitors drivers add nothing yet (graphics.library's private
- * AddDisplayInfo calls are not done). */
+ * The database is ours: the default, NTSC and PAL monitors times the 30
+ * native keys of modeid.h, each with its NotAvailable from the chips; and
+ * Multiscan, DblNTSC and DblPAL with the keys, records and names OS 3.2.3's
+ * drivers give (measured with tests/MonitorProbe.c on 3 November 2026),
+ * there while the driver's own MonitorSpec is on GfxBase->MonitorList (a
+ * driver adds it there itself). Their timing (rows, colour clocks, first
+ * row, BEAMCON0 and the SpecialMonitor's sync and blank) is the driver's:
+ * MonitorInfo reads it from that MonitorSpec. Other drivers add nothing
+ * yet (graphics.library's private AddDisplayInfo calls are not done). */
 #include "display_int.h"
 
 using namespace gd;
@@ -23,49 +28,110 @@ namespace {
 
 enum : uint8_t { K_LACE = 1, K_HAM = 2, K_EHB = 4, K_DPF = 8, K_DPF2 = 16 };
 enum : uint8_t { NEED_OCS = 0, NEED_ECS = 1, NEED_AGA = 2 };
+/* on: the monitors that have the key (ON_ below) */
+enum : uint8_t { ON_STD = 1, ON_DBL = 2, ON_MULTI = 4, ON_ALL = 7 };
 struct keydef {
     uint16_t key;
     uint8_t res;                        /* 0 lores, 1 hires, 2 superhires */
     uint8_t flags;
     uint8_t need;
+    uint8_t on;
 };
 constexpr keydef keys[NKEYS] = {
-    { 0x0000, 0, 0, NEED_OCS },      { 0x0004, 0, K_LACE, NEED_OCS },
-    { 0x0080, 0, K_EHB, NEED_OCS },  { 0x0084, 0, K_EHB | K_LACE, NEED_OCS },
-    { 0x0400, 0, K_DPF, NEED_OCS },  { 0x0404, 0, K_DPF | K_LACE, NEED_OCS },
-    { 0x0440, 0, K_DPF | K_DPF2, NEED_OCS }, { 0x0444, 0, K_DPF | K_DPF2 | K_LACE, NEED_OCS },
-    { 0x0800, 0, K_HAM, NEED_OCS },  { 0x0804, 0, K_HAM | K_LACE, NEED_OCS },
-    { 0x8000, 1, 0, NEED_OCS },      { 0x8004, 1, K_LACE, NEED_OCS },
-    { 0x8020, 2, 0, NEED_ECS },      { 0x8024, 2, K_LACE, NEED_ECS },
-    { 0x8080, 1, K_EHB, NEED_AGA },  { 0x8084, 1, K_EHB | K_LACE, NEED_AGA },
-    { 0x80A0, 2, K_EHB, NEED_AGA },  { 0x80A4, 2, K_EHB | K_LACE, NEED_AGA },
-    { 0x8400, 1, K_DPF, NEED_OCS },  { 0x8404, 1, K_DPF | K_LACE, NEED_OCS },
-    { 0x8420, 2, K_DPF, NEED_ECS },  { 0x8424, 2, K_DPF | K_LACE, NEED_ECS },
-    { 0x8440, 1, K_DPF | K_DPF2, NEED_OCS }, { 0x8444, 1, K_DPF | K_DPF2 | K_LACE, NEED_OCS },
-    { 0x8460, 2, K_DPF | K_DPF2, NEED_ECS }, { 0x8464, 2, K_DPF | K_DPF2 | K_LACE, NEED_ECS },
-    { 0x8800, 1, K_HAM, NEED_AGA },  { 0x8804, 1, K_HAM | K_LACE, NEED_AGA },
-    { 0x8820, 2, K_HAM, NEED_AGA },  { 0x8824, 2, K_HAM | K_LACE, NEED_AGA },
+    { 0x0000, 0, 0, NEED_OCS, ON_ALL },      { 0x0004, 0, K_LACE, NEED_OCS, ON_ALL },
+    { 0x0080, 0, K_EHB, NEED_OCS, ON_ALL },  { 0x0084, 0, K_EHB | K_LACE, NEED_OCS, ON_ALL },
+    { 0x0400, 0, K_DPF, NEED_OCS, ON_STD },  { 0x0404, 0, K_DPF | K_LACE, NEED_OCS, ON_ALL },
+    { 0x0440, 0, K_DPF | K_DPF2, NEED_OCS, ON_STD }, { 0x0444, 0, K_DPF | K_DPF2 | K_LACE, NEED_OCS, ON_ALL },
+    { 0x0800, 0, K_HAM, NEED_OCS, ON_ALL },  { 0x0804, 0, K_HAM | K_LACE, NEED_OCS, ON_ALL },
+    { 0x8000, 1, 0, NEED_OCS, ON_ALL },      { 0x8004, 1, K_LACE, NEED_OCS, ON_ALL },
+    { 0x8020, 2, 0, NEED_ECS, ON_STD | ON_MULTI }, { 0x8024, 2, K_LACE, NEED_ECS, ON_STD | ON_MULTI },
+    { 0x8080, 1, K_EHB, NEED_AGA, ON_ALL },  { 0x8084, 1, K_EHB | K_LACE, NEED_AGA, ON_ALL },
+    { 0x80A0, 2, K_EHB, NEED_AGA, ON_STD | ON_MULTI }, { 0x80A4, 2, K_EHB | K_LACE, NEED_AGA, ON_STD | ON_MULTI },
+    { 0x8400, 1, K_DPF, NEED_OCS, ON_STD },  { 0x8404, 1, K_DPF | K_LACE, NEED_OCS, ON_ALL },
+    { 0x8420, 2, K_DPF, NEED_ECS, ON_STD },  { 0x8424, 2, K_DPF | K_LACE, NEED_ECS, ON_STD | ON_MULTI },
+    { 0x8440, 1, K_DPF | K_DPF2, NEED_OCS, ON_STD }, { 0x8444, 1, K_DPF | K_DPF2 | K_LACE, NEED_OCS, ON_ALL },
+    { 0x8460, 2, K_DPF | K_DPF2, NEED_ECS, ON_STD }, { 0x8464, 2, K_DPF | K_DPF2 | K_LACE, NEED_ECS, ON_STD | ON_MULTI },
+    { 0x8800, 1, K_HAM, NEED_AGA, ON_ALL },  { 0x8804, 1, K_HAM | K_LACE, NEED_AGA, ON_ALL },
+    { 0x8820, 2, K_HAM, NEED_AGA, ON_STD | ON_MULTI }, { 0x8824, 2, K_HAM | K_LACE, NEED_AGA, ON_STD | ON_MULTI },
 };
-constexpr uint32_t monids[NMONITORS] = { GD_DEFAULT_MONITOR_ID, GD_NTSC_MONITOR_ID, GD_PAL_MONITOR_ID };
-const char *const monnames[NMONITORS] = { "default.monitor", "ntsc.monitor", "pal.monitor" };
+constexpr uint32_t monids[NMONITORS] = { GD_DEFAULT_MONITOR_ID, GD_NTSC_MONITOR_ID, GD_PAL_MONITOR_ID,
+                                         0x00031000, 0x00091000, 0x000A1000 };   /* VGA (Multiscan), DBLNTSC, DBLPAL */
+const char *const monnames[NMONITORS] = { "default.monitor", "ntsc.monitor", "pal.monitor",
+                                          "multiscan.monitor", "DblNTSC.monitor", "DblPAL.monitor" };
+constexpr uint8_t monon[NMONITORS] = { ON_STD, ON_STD, ON_STD, ON_MULTI, ON_DBL, ON_DBL };
 const char *const resnames[3] = { "Low Res", "High Res", "Super-High Res" };
 
+/* What OS 3.2.3's Multiscan, DblNTSC and DblPAL drivers' records say that
+ * their MonitorSpecs do not (MonitorProbe): the view position and its
+ * range's far corner, the vertical resolution (ticks) of a No Flicker mode,
+ * the nominal rows of the others, the overscan's extra rows, the preferred
+ * mode and the names' prefix. */
+struct mon31 {
+    int16_t posx, posy, rx1, ry1, vres, rows, extra;
+    uint32_t pref;
+    const char *name;
+};
+const mon31 mons31[3] = {
+    { 83, 25, 85, 25, 22, 240, 0, 0x00039024, "MULTISCAN:" },
+    { 91, 50, 101, 77, 26, 200, 13, 0x00099004, "DBLNTSC:" },
+    { 91, 42, 101, 61, 22, 256, 9, 0x000A9004, "DBLPAL:" },
+};
+
 struct mode {
-    int mon;                            /* 0 default, 1 ntsc, 2 pal */
+    int mon;                            /* monids' index */
     const keydef *k;
     uint32_t id;
 };
 
-bool find_mode(uint32_t id, mode &m)
+int ncmp(const char *a, const char *b);
+
+/* a monitor's MonitorSpec: a built-in's, or the driver's on MonitorList
+ * (null while it has not run) */
+gd_monitorspec *mspec(gfx_env *env, int mon)
+{
+    if (mon < NBUILTIN) return st(env)->monitors[mon];
+    for (gfx_node *n = base(env)->monitorlist.head; n->succ; n = n->succ)
+        if (n->name && !ncmp(n->name, monnames[mon])) return reinterpret_cast<gd_monitorspec *>(n);
+    return nullptr;
+}
+
+bool find_mode(gfx_env *env, uint32_t id, mode &m)
 {
     for (int i = 0; i < NMONITORS; i++)
-        if ((id & GD_MONITOR_ID_MASK) == monids[i])
+        if ((id & GD_MONITOR_ID_MASK) == monids[i] && mspec(env, i))
             for (int j = 0; j < NKEYS; j++)
-                if ((id & ~GD_MONITOR_ID_MASK) == keys[j].key) {
+                if ((id & ~GD_MONITOR_ID_MASK) == keys[j].key && (keys[j].on & monon[i])) {
                     m = { i, &keys[j], id };
                     return true;
                 }
     return false;
+}
+
+/* a driver mode's bitplanes: 0 lores, 1 hires, 2 superhires; DblNTSC's and
+ * DblPAL's a resolution faster than the key says */
+int bres(const mode &m) { return m.k->res + (monon[m.mon] == ON_DBL ? 1 : 0); }
+
+/* a driver mode's properties, as OS 3.2.3's records have them: every one
+ * with programmed beam, sprites, double buffering; a mode without
+ * LACE (each row on two lines) AA and SCANDBL; a No Flicker one ECS, or AA
+ * for HAM and EHB on bitplanes faster than lores; the Workbench's, without
+ * HAM, EHB or dual playfield (Multiscan: on superhires only) */
+uint32_t props31(const mode &m)
+{
+    const uint8_t f = m.k->flags;
+    const int r = bres(m);
+    uint32_t p = GD_DIPF_IS_SPRITES | GD_DIPF_IS_DRAGGABLE | GD_DIPF_IS_BEAMSYNC | GD_DIPF_IS_SPRITES_ATT
+                 | GD_DIPF_IS_SPRITES_CHNG_RES | GD_DIPF_IS_SPRITES_BORDER | GD_DIPF_IS_SPRITES_CHNG_BASE
+                 | GD_DIPF_IS_SPRITES_CHNG_PRI | GD_DIPF_IS_DBUFFER | GD_DIPF_IS_PROGBEAM;
+    if (f & K_HAM) p |= GD_DIPF_IS_HAM;
+    if (f & K_EHB) p |= GD_DIPF_IS_EXTRAHALFBRITE;
+    if (f & K_DPF) p |= GD_DIPF_IS_DUALPF;
+    if (f & K_DPF2) p |= GD_DIPF_IS_PF2PRI;
+    if (m.mon == 5) p |= GD_DIPF_IS_PAL;
+    if (!(f & (K_HAM | K_EHB | K_DPF)) && (monon[m.mon] == ON_DBL || r == 2)) p |= GD_DIPF_IS_WB;
+    if (!(f & K_LACE)) p |= GD_DIPF_IS_AA | GD_DIPF_IS_SCANDBL;
+    else p |= (f & (K_HAM | K_EHB)) && r ? GD_DIPF_IS_AA : GD_DIPF_IS_ECS;
+    return p;
 }
 
 bool mon_pal(gfx_env *env, int mon)
@@ -78,6 +144,12 @@ bool mon_pal(gfx_env *env, int mon)
 uint32_t avail(gfx_env *env, const mode &m)
 {
     uint8_t c = base(env)->chiprevbits0;
+    if (m.mon >= NBUILTIN) {
+        uint32_t p = props31(m);
+        if ((p & GD_DIPF_IS_AA) && !(c & GFX_GFXF_AA_LISA)) return GD_DI_AVAIL_NOCHIPS;
+        if (!(c & (GFX_GFXF_HR_DENISE | GFX_GFXF_AA_LISA))) return GD_DI_AVAIL_NOCHIPS;
+        return 0;
+    }
     if (m.k->need == NEED_ECS && !(c & (GFX_GFXF_HR_DENISE | GFX_GFXF_AA_LISA))) return GD_DI_AVAIL_NOCHIPS;
     if (m.k->need == NEED_AGA && !(c & GFX_GFXF_AA_LISA)) return GD_DI_AVAIL_NOCHIPS;
     return 0;
@@ -85,6 +157,7 @@ uint32_t avail(gfx_env *env, const mode &m)
 
 uint32_t props(gfx_env *env, const mode &m)
 {
+    if (m.mon >= NBUILTIN) return props31(m);
     uint32_t p = GD_DIPF_IS_SPRITES | GD_DIPF_IS_DRAGGABLE | GD_DIPF_IS_BEAMSYNC | GD_DIPF_IS_DBUFFER
                  | GD_DIPF_IS_SPRITES_ATT;
     uint8_t f = m.k->flags;
@@ -125,6 +198,11 @@ void rect(gfx_rectangle &r, int x0, int y0, int x1, int y1)
 
 void nominal(gfx_env *env, const mode &m, int &w, int &h)
 {
+    if (m.mon >= NBUILTIN) {
+        w = 160 << bres(m);
+        h = mons31[m.mon - NBUILTIN].rows << ((m.k->flags & K_LACE) ? 1 : 0);
+        return;
+    }
     w = 320 << m.k->res;
     h = (mon_pal(env, m.mon) ? 256 : 200) << ((m.k->flags & K_LACE) ? 1 : 0);
 }
@@ -210,13 +288,100 @@ gd_monitorspec *new_monitor(gfx_env *env, int i, bool pal)
     return ms;
 }
 
-const mode *mode_by_index(int i, mode &m)
+/* GetDisplayInfoData's records of a driver's mode, as OS 3.2.3's (MonitorProbe):
+ * answers the record's length, 0 for none */
+uint32_t info31(gfx_env *env, const mode &m, gd_monitorspec *ms, uint32_t tagid, void *buf)
 {
-    m = { i / NKEYS, &keys[i % NKEYS], monids[i / NKEYS] | keys[i % NKEYS].key };
-    return &m;
+    const mon31 &d = mons31[m.mon - NBUILTIN];
+    const bool dbl = monon[m.mon] == ON_DBL, ff = (m.k->flags & K_LACE) != 0;
+    const int r = bres(m), yres = ff ? d.vres : 2 * d.vres;
+    int w, h;
+    nominal(env, m, w, h);
+    switch (tagid) {
+    case GD_DTAG_DISP: {
+        gd_displayinfo &di = *static_cast<gd_displayinfo *>(buf);
+        di.notavailable = static_cast<uint16_t>(avail(env, m));
+        di.propertyflags = props31(m);
+        di.resolution = { static_cast<int16_t>(88 >> r), static_cast<int16_t>(yres) };
+        di.pixelspeed = static_cast<uint16_t>(140 >> r);
+        di.numstdsprites = 8;
+        di.paletterange = aga(env) ? 0xFFFF : 4096;
+        di.spriteresolution = { static_cast<int16_t>(176 >> r), d.vres };
+        di.redbits = di.greenbits = di.bluebits = aga(env) ? 8 : 4;
+        return sizeof di;
+    }
+    case GD_DTAG_DIMS: {
+        gd_dimensioninfo &dm = *static_cast<gd_dimensioninfo *>(buf);
+        dm.maxdepth = static_cast<uint16_t>(maxdepth(env, m));
+        dm.minrasterwidth = 16;
+        dm.minrasterheight = 1;
+        dm.maxrasterwidth = 16368;
+        dm.maxrasterheight = 16384;
+        rect(dm.nominal, 0, 0, w - 1, h - 1);
+        /* the overscan: DblNTSC and DblPAL w/16 pixels and `extra` rows
+         * (No Flicker: twice that and one more above) each side, the video
+         * overscan 13w/80 to the left; Multiscan w/80 and 9w/80, no rows */
+        if (dbl)
+            rect(dm.maxoscan, -w / 16, ff ? -2 * d.extra - 1 : -d.extra, w + w / 16 - 1,
+                 ff ? 2 * (d.rows + d.extra) : d.rows + d.extra);
+        else
+            rect(dm.maxoscan, -w / 80, 0, w + w / 80 - 1, h - 1);
+        dm.videooscan = dm.maxoscan;
+        dm.videooscan.minx = static_cast<int16_t>(-w * (dbl ? 13 : 9) / 80);
+        dm.txtoscan = dm.stdoscan = dm.nominal;
+        return sizeof dm;
+    }
+    case GD_DTAG_MNTR: {
+        gd_monitorinfo &mi = *static_cast<gd_monitorinfo *>(buf);
+        mi.mspc = ms;
+        mi.viewposition = mi.defaultviewposition = { d.posx, d.posy };
+        mi.viewresolution = { 88, d.vres };
+        rect(mi.viewpositionrange, 81, ms->min_row, d.rx1, d.ry1);
+        mi.totalrows = ms->total_rows;
+        mi.totalcolorclocks = ms->total_colorclocks;
+        mi.minrow = ms->min_row;
+        mi.compatibility = 0;                               /* MCOMPAT_MIXED */
+        mi.mouseticks = { 22, d.vres };
+        mi.preferredmodeid = d.pref;
+        return sizeof mi;
+    }
+    case GD_DTAG_NAME: {
+        /* named: DblNTSC's and DblPAL's Low and High Res, plain and No
+         * Flicker; Multiscan's Extra-Low Res, Low Res and Productivity (No
+         * Flicker) and Productivity Dblescan; no other */
+        const char *t = nullptr;
+        switch (m.k->key) {
+        case 0x0000: t = dbl ? "Low Res" : nullptr; break;
+        case 0x8000: t = dbl ? "High Res" : nullptr; break;
+        case 0x0004: t = dbl ? "Low Res No Flicker" : "Extra-Low Res"; break;
+        case 0x8004: t = dbl ? "High Res No Flicker" : "Low Res"; break;
+        case 0x8020: t = "Productivity Dblescan"; break;
+        case 0x8024: t = "Productivity"; break;
+        }
+        if (!t) return 0;
+        gd_nameinfo &ni = *static_cast<gd_nameinfo *>(buf);
+        char *p = reinterpret_cast<char *>(ni.name);
+        for (const char *q = d.name; *q;) *p++ = *q++;
+        while (*t) *p++ = *t++;
+        return sizeof ni;
+    }
+    }
+    return 0;
 }
 
 } // namespace
+
+namespace gd {
+
+int scan_of(const gd_monitorspec *ms)
+{
+    const char *n = ms ? ms->n.node.name : nullptr;
+    if (!n) return SCAN_NONE;
+    if (!ncmp(n, monnames[3])) return SCAN_MULTI;
+    return !ncmp(n, monnames[4]) || !ncmp(n, monnames[5]) ? SCAN_DBL : SCAN_NONE;
+}
+
+} // namespace gd
 
 extern "C" {
 
@@ -318,7 +483,7 @@ gd_monitorspec *gd_OpenMonitor(gfx_env *env, const char *name, uint32_t id)
     } else {
         uint32_t mon = id == GD_INVALID_ID ? 0 : id & GD_MONITOR_ID_MASK;
         for (int i = 0; i < NMONITORS; i++)
-            if (monids[i] == mon) ms = st(env)->monitors[i];
+            if (monids[i] == mon) ms = mspec(env, i);
     }
     if (ms) ms->opencount++;
     env->permit(env->ctx);
@@ -340,20 +505,20 @@ int32_t gd_CloseMonitor(gfx_env *env, gd_monitorspec *ms)
 void *gd_FindDisplayInfo(gfx_env *env, uint32_t id)
 {
     state *s = st(env);
+    mode m;
     for (int i = 0; i < NMODES; i++)
-        if (s->modeids[i] == id) return &s->modeids[i];
+        if (s->modeids[i] == id) return find_mode(env, id, m) ? &s->modeids[i] : nullptr;
     return nullptr;
 }
 
 uint32_t gd_NextDisplayInfo(gfx_env *env, uint32_t id)
 {
     state *s = st(env);
-    if (id == GD_INVALID_ID) return s->modeids[0];
-    for (int i = 0; i + 1 < NMODES; i++)
-        if (s->modeids[i] == id) return s->modeids[i + 1];
-    /* an ID not in the database: the next one above it (ABI test) */
+    mode m;
+    /* the next one above id, in or not in the database (ABI test); modeids
+     * is in order, a driver's modes there while it is */
     for (int i = 0; i < NMODES; i++)
-        if (s->modeids[i] > id) return s->modeids[i];
+        if ((id == GD_INVALID_ID || s->modeids[i] > id) && find_mode(env, s->modeids[i], m)) return s->modeids[i];
     return GD_INVALID_ID;
 }
 
@@ -366,10 +531,10 @@ uint32_t gd_GetDisplayInfoData(gfx_env *env, void *handle, void *buf, uint32_t s
         id = *h;
     }
     mode m;
-    if (!buf || !find_mode(id, m)) return 0;
+    if (!buf || !find_mode(env, id, m)) return 0;
     const bool pal = mon_pal(env, m.mon), lace = (m.k->flags & K_LACE) != 0;
     const int xm = 1 << m.k->res, ym = lace ? 2 : 1;
-    gd_monitorspec *ms = s->monitors[m.mon];
+    gd_monitorspec *ms = mspec(env, m.mon);
     union {
         gd_displayinfo di;
         gd_dimensioninfo dims;
@@ -378,6 +543,10 @@ uint32_t gd_GetDisplayInfoData(gfx_env *env, void *handle, void *buf, uint32_t s
     } u;
     zero(&u, sizeof u);
     uint32_t len;
+    if (m.mon >= NBUILTIN) {
+        len = info31(env, m, ms, tagid, &u);
+        if (!len) return 0;
+    } else
     switch (tagid) {
     case GD_DTAG_DISP:
         len = sizeof u.di;
@@ -466,9 +635,9 @@ uint32_t gd_GetVPModeID(gfx_env *env, const gd_viewport *vp)
 uint32_t gd_ModeNotAvailable(gfx_env *env, uint32_t id)
 {
     mode m;
-    if (find_mode(id, m)) return avail(env, m);
+    if (find_mode(env, id, m)) return avail(env, m);
     for (int i = 0; i < NMONITORS; i++)
-        if ((id & GD_MONITOR_ID_MASK) == monids[i]) return GD_DI_AVAIL_NOCHIPS;
+        if ((id & GD_MONITOR_ID_MASK) == monids[i] && mspec(env, i)) return GD_DI_AVAIL_NOCHIPS;
     return GD_DI_AVAIL_NOMONITOR;       /* ABI test */
 }
 
@@ -488,7 +657,7 @@ uint32_t gd_BestModeIDA(gfx_env *env, const gfx_tagitem *tags)
     }
     source = tag_data(tags, GD_BIDTAG_SourceID, source);
     mode sm;
-    bool hassrc = source != GD_INVALID_ID && find_mode(source, sm);
+    bool hassrc = source != GD_INVALID_ID && find_mode(env, source, sm);
     if (hassrc) {
         uint32_t sp = props(env, sm) & special;
         must |= sp;
@@ -514,7 +683,7 @@ uint32_t gd_BestModeIDA(gfx_env *env, const gfx_tagitem *tags)
     uint32_t bestscore[4] = { ~0u, ~0u, ~0u, ~0u };
     for (int i = 0; i < NMODES; i++) {
         mode m;
-        mode_by_index(i, m);
+        if (!find_mode(env, st(env)->modeids[i], m)) continue;
         if (monitor != GD_INVALID_ID && (m.id & GD_MONITOR_ID_MASK) != (monitor & GD_MONITOR_ID_MASK)) continue;
         if (avail(env, m)) continue;
         uint32_t p = props(env, m);
@@ -556,11 +725,11 @@ uint32_t gd_CoerceMode(gfx_env *env, gd_viewport *vp, uint32_t monitorid, uint32
     for (int pass = flags & GD_AVOID_FLICKER && key & GD_LACE ? 0 : 1; pass < 2; pass++) {
         uint32_t k = pass ? key : key & ~uint32_t(GD_LACE);
         id = mon | k;
-        if (find_mode(id, m) && !avail(env, m)) return id;
+        if (find_mode(env, id, m) && !avail(env, m)) return id;
         if (flags & GD_PRESERVE_COLORS) continue;
         /* the same resolution without HAM, EHB or dual playfield (ours) */
         id = mon | (k & (GD_HIRES | GD_SUPERHIRES | GD_LACE));
-        if (find_mode(id, m) && !avail(env, m)) return id;
+        if (find_mode(env, id, m) && !avail(env, m)) return id;
     }
     return GD_INVALID_ID;
 }
@@ -692,7 +861,10 @@ int gd_init(gfx_env *env, int own_hw)
     gb->actiewcprsemaphore = &s->sems[SEM_ACTIVIEWCPR];
     gb->monitorlistsemaphore = &s->sems[SEM_MONITORLIST];
     gb->hashtablesemaphore = &s->sems[SEM_HASHTABLE];
-    for (int i = 0; i < NMODES; i++) s->modeids[i] = monids[i / NKEYS] | keys[i % NKEYS].key;
+    int n = 0;
+    for (int i = 0; i < NMONITORS; i++)
+        for (int j = 0; j < NKEYS; j++)
+            if (keys[j].on & monon[i]) s->modeids[n++] = monids[i] | keys[j].key;
 
     /* the chips: Agnus says PAL or NTSC */
     unsigned agnus = (env->chip_read(env->ctx, GD_VPOSR) >> 8) & 0x7F;
@@ -701,7 +873,7 @@ int gd_init(gfx_env *env, int own_hw)
     build_copinit(env, s->copinit);
     gd_SetChipRev(env, 0xFFFFFFFFu);    /* SETCHIPREV_BEST */
 
-    for (int i = 0; i < NMONITORS; i++) {
+    for (int i = 0; i < NBUILTIN; i++) {
         s->monitors[i] = new_monitor(env, i, i == 2 || (i == 0 && pal));
         if (!s->monitors[i]) {
             gd_exit(env);
@@ -740,7 +912,7 @@ void gd_exit(gfx_env *env)
     gfx_base *gb = base(env);
     state *s = st(env);
     if (!s) return;
-    for (int i = 0; i < NMONITORS; i++)
+    for (int i = 0; i < NBUILTIN; i++)
         if (s->monitors[i]) {
             remove(&s->monitors[i]->n.node);
             gd_GfxFree(env, &s->monitors[i]->n);

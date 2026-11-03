@@ -323,3 +323,7 @@ with open(exp, 'a') as E2:
         E2.write('fetch chip %d done\n' % c)
     for c in range(3):
         E2.write('sprites chip %d done\n' % c)
+    # OS 3.2.3's records of the Multiscan, DblNTSC and DblPAL modes (MonitorProbe)
+    with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'display_os323_modes.txt')) as M:
+        E2.write(M.read())
+    E2.write('monitors done\n')
