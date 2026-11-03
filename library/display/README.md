@@ -47,8 +47,9 @@ The copper starts at copinit, which is in Chip RAM: FMODE, a blank window, BPLCO
 The horizontal position follows the HRM:
 
 - Lores data shows from 2·DDFSTRT+17, and hires and super hires from 2·DDFSTRT+9 (in lores pixels).
-- AGA's wider fetch (FMODE bits 0-1): a ViewPort deeper than the 1× fetch shows (hires over 4 planes, super hires over 2) is fetched at 2× (hires, FMODE 1) or 4× (super hires, FMODE 3), so every resolution shows 8 planes on AGA. Both still fetch in 8 colour clock cycles, so DDFSTOP is the last cycle's start as at 1×, with 2 (hires) or 4 (super hires) words of each plane a cycle; their data shows from 2·DDFSTRT+17, so a full hires screen fetches from 0x38 to 0xD0. DDFSTRT is then on 8 clocks and each playfield's first fetch on its width, and BPLCON1 (AGA's 8 bits) carries the rest. The narrowest fetch that shows the planes is used, so what showed at 1× is made as before.
-- A wider fetch needs the bitmap's planes and rows on 32 bits (2×) or 64 bits (4×): AllocBitMap's displayable bitmaps are on 64 bits on AGA. Otherwise MakeVPort answers MVP_NO_DISPLAY.
+- AGA's wider fetch (FMODE bits 0-1) takes 2 or 4 words of each plane a cycle. AGA uses the widest fetch the ViewPort's bitmaps allow: planes and rows on 64 bits give 4× (FMODE 3), on 32 bits 2× (FMODE 1), else 1×. This leaves the most chip bus cycles to the CPU and the blitter. A ViewPort deeper than the 1× fetch shows (hires over 4 planes, super hires over 2) needs 2× (hires) or 4× (super hires), so every resolution shows 8 planes on AGA; with its bitmap off that width MakeVPort answers MVP_NO_DISPLAY. AllocBitMap's displayable bitmaps are on 64 bits on AGA.
+- The fetch cycle is 8 colour clocks, except lores at 2× (16) and 4× (32) and hires at 4× (16). At 8 clocks DDFSTOP is the last cycle's start. At 16 and 32 the fetch runs to the end of the cycle DDFSTOP falls in and one cycle more, so DDFSTOP is 8 clocks into the last cycle but one, and a fetch is at least 2 cycles: a 320 pixel lores screen at 4× fetches 0x38-0xA0, a 640 pixel hires screen 0x38-0xC0.
+- At 2× and 4× the data shows from 2·DDFSTRT+17, so a full screen of any resolution fetches from 0x38. DDFSTRT is then on 8 clocks and each playfield's first fetch on its width, and BPLCON1 (AGA's 8 bits, up to 64 lores pixels) carries the rest. A wider fetch that would start before 0x18 (the HRM's first DDFSTRT; a ViewPort at the left edge, scrolled) falls back to a narrower one.
 - Every AGA ViewPort's first block sets FMODE: its fetch with copinit's sprite width. A sprite width change (ChangeExtSpriteA) rewrites the shown ViewPorts' blocks.
 - Each playfield's scroll (BPLCON1) and the fetch start are worked out so the first word fetched is the one holding RxOffset at DIW start.
 - DDFSTOP covers the window, in whole fetch units, and is clamped at 0xD8.
@@ -60,7 +61,7 @@ The horizontal position follows the HRM:
 | --- | --- | --- |
 | InitView | Every byte 0, then DxOffset 0x81 and DyOffset 0x2C (STANDARD_VIEW_X/Y) | ABI test (INITVIEW) |
 | InitVPort | Every byte 0 | ABI test (INITVPORT) |
-| MakeVPort with no RasInfo or bitmap, or too many planes for the chips (OCS and ECS: lores 6, hires 4, super hires 2; AGA: 8 in each, hires at 2× and super hires at 4×), or a wider fetch's bitmap off its width | MVP_NO_DISPLAY | documented codes; the limits are the chips' |
+| MakeVPort with no RasInfo or bitmap, or too many planes for the chips (OCS and ECS: lores 6, hires 4, super hires 2; AGA: 8 in each, hires at 2× and super hires at 4×), or a bitmap off the width of the fetch its planes need | MVP_NO_DISPLAY | documented codes; the limits are the chips' |
 | DimensionInfo's MaxDepth | AGA: 8 in every resolution, 6 for EHB. OCS and ECS: lores 5 (6 with EHB, HAM or dual playfield), hires 4, super hires 2 | the chips' fetch |
 | MakeVPort below the frame | MVP_OFF_BOTTOM, with the old DspIns left alone | ABI test (VIEW offbottom) |
 | VP_HIDE | MakeVPort answers MVP_OK and MrgCop leaves the ViewPort out | documented; ABI test |
@@ -103,7 +104,7 @@ The horizontal position follows the HRM:
 
 ## The tests
 
-`tests/m68k/test_gfx_display.sh` builds the core with m68k-linux-gnu-g++ 13.3 for the 68040 at -O0 and -O2 (until 17 October 2026 also for the 68000 and 68020). It runs each build under qemu-m68k 8.2 on a simulated machine: exec's memory, the custom registers, a copper running the lists four colour clocks per instruction, and an Agnus/Denise/Lisa that shows the bitplanes line by line, in 35 ns (super hires) pixels. The display models OCS, ECS and AGA; lores, hires and super hires; AGA's 1×, 2× and 4× fetches; HAM6, HAM8, EHB, dual playfield, PF2OF, BPLAM and LOCT. A line fetched against the chips' rules fails the test: more planes than its fetch shows, a DDFSTOP off the fetch's cycle, or a pointer or modulo off a wider fetch's width.
+`tests/m68k/test_gfx_display.sh` builds the core with m68k-linux-gnu-g++ 13.3 for the 68040 at -O0 and -O2 (until 17 October 2026 also for the 68000 and 68020). It runs each build under qemu-m68k 8.2 on a simulated machine: exec's memory, the custom registers, a copper running the lists four colour clocks per instruction, and an Agnus/Denise/Lisa that shows the bitplanes line by line, in 35 ns (super hires) pixels. The display models OCS, ECS and AGA; lores, hires and super hires; AGA's 1×, 2× and 4× fetches; HAM6, HAM8, EHB, dual playfield, PF2OF, BPLAM and LOCT. A line fetched against the chips' rules fails the test: more planes than its fetch shows, a DDFSTRT before 0x18, a DDFSTOP off the fetch's cycle, or a pointer or modulo off a wider fetch's width.
 
 `test_gfx_display_model.py` is written separately from the library and does not model the copper. It makes scenes and says, from the documented View and ViewPort rules, what each ViewPort must show. The scenes cover:
 
@@ -118,7 +119,7 @@ For each ViewPort, it checks the picture after MakeVPort, MrgCop and LoadView, a
 The harness also checks:
 
 - The database, monitors, VideoControl, sprites, the beam and WaitTOF.
-- The fetch per chipset: DimensionInfo's MaxDepth for each kind of mode; MakeVPort's answer for lores, hires and super hires at depths 1 to 8, plain and laced; and the DDFSTRT, DDFSTOP, modulos, BPLCON1 and FMODE it sets. Also SysInfo 4.4's screen (640 super hires pixels, 3 planes: 4×, 0x38-0x80), a scrolled 8-plane hires screen, bitmaps off a wider fetch's width, and FMODE taking a 32-pixel sprite's width in a shown View.
+- The fetch per chipset: DimensionInfo's MaxDepth for each kind of mode; MakeVPort's answer for lores, hires and super hires at depths 1 to 8, plain and laced; and the DDFSTRT, DDFSTOP, modulos, BPLCON1 and FMODE it sets. Also SysInfo 4.4's screen (640 super hires pixels, 3 planes: 4×, 0x38-0x80), a scrolled 8-plane hires screen at 4×, lores on 32 bits at 2×, a lores screen at the left edge scrolled back to 1×, bitmaps off a wider fetch's width, and FMODE taking a 32-pixel sprite's width in a shown View.
 - Running out of memory, and all memory given back.
 - The side-by-side mode.
 
@@ -128,7 +129,7 @@ After that, the script:
 - Compiles `display_lvo.c` as C.
 - Runs nm checks: the core calls nothing but libgcc, and there is no .data, .bss or C++ runtime.
 
-Result (m68k-linux-gnu-g++ 13.3.0, qemu-m68k 8.2.2, seed 20261013, 120 scenes, 24 October 2026): every build shows the same 855 ViewPort pictures as the model, with 3813 checks and 0 failed.
+Result (m68k-linux-gnu-g++ 13.3.0, qemu-m68k 8.2.2, seed 20261013, 120 scenes, 3 November 2026): every build shows the same 855 ViewPort pictures as the model, with 3818 checks and 0 failed. Seeds 7 (400 scenes) and 99 (300) also pass.
 
 `tests/ScreenDepthProbe.c` runs on an Amiga with any ROM. It prints the MaxDepth of lores, hires and super hires, whether SysInfo 4.4's screen and its neighbours open, and a table of every resolution and depth from 1 to 8, plain and laced. With MODES and DEPTH it holds one screen on show, with a bar for each colour, for a screenshot. `library/display/build-amiga.sh` builds it.
 
@@ -137,7 +138,6 @@ Result (m68k-linux-gnu-g++ 13.3.0, qemu-m68k 8.2.2, seed 20261013, 120 scenes, 2
 ## Not yet
 
 - Wide sprites: SPRITEA_Width 32 and 64 are allocated, but shown at 16.
-- Lores at 2× and 4×, and hires at 4×: not used (lores shows 8 planes at 1×). Their DDFSTOP rule differs (the cycle DDFSTOP falls in and one more), and the test's machine models it only as the AGA runtime does.
 - DIWHIGH (windows past line 511 or ECS's extended horizontal range) and the productivity, VGA and other monitors' beam programming. The database has only the default, NTSC and PAL monitors.
 - Monitor drivers from DEVS:Monitors (the private AddDisplayInfo slots) and DTAG_VEC.
 - `gfx_hook_vsprites`: SprIns from gels' VSprites is still the stub.
