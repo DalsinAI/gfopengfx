@@ -83,7 +83,7 @@ static void mode(ULONG id)
         if (!h) return;
         Printf("MODE %08lx na %lx", id, ModeNotAvailable(id));
         if (GetDisplayInfoData(h, (UBYTE *)&di, sizeof di, DTAG_DISP, 0))
-            Printf(" props %08lx res %ld,%ld speed %ld sprres %ld,%ld", di.PropertyFlags, (LONG)di.Resolution.x,
+            Printf(" rec %08lx props %08lx res %ld,%ld speed %ld sprres %ld,%ld", di.Header.DisplayID, di.PropertyFlags, (LONG)di.Resolution.x,
                    (LONG)di.Resolution.y, (LONG)di.PixelSpeed, (LONG)di.SpriteResolution.x, (LONG)di.SpriteResolution.y);
         if (GetDisplayInfoData(h, (UBYTE *)&dm, sizeof dm, DTAG_DIMS, 0)) {
             Printf(" depth %ld", (LONG)dm.MaxDepth);
