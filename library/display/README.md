@@ -79,6 +79,8 @@ The horizontal position follows the HRM:
 | FreeVPortCopLists | Frees DspIns, SprIns, ClrIns and the UCopList, including the UCopList structure itself | documented; ABI test (UCOP freed) |
 | SpritePriorities 0 | BPLCON2 0x24, as OS 3.2 does | ABI test |
 | MoveSprite | x in the ViewPort's pixels and y in its lines; HSTART is the View's left edge plus x − 1 | ABI test (SPRITE moved) |
+| MoveSprite on AGA in a hires or super hires ViewPort | HSTART in 35 ns pixels: SPRxCTL's SH1 (bit 4) and SH0 (bit 3) as well, so the sprite moves by the ViewPort's own pixels | AGA's SPRxCTL; test |
+| Sprite width (SPRITEA_Width 32 or 64) | One width for all eight sprites, as the chips fetch them (FMODE's SPR32 and SPAGEM, GfxBase's SpriteWidth and SpriteFMode). GetExtSpriteA and ChangeExtSpriteA set it to the sprite's; SPRxCTL is the first word of the sprite's second fetch (word 2 or 4). On OCS and ECS a wider sprite is refused: GetExtSpriteA answers -1, ChangeExtSpriteA 0. (Until 3 November 2026 GetExtSpriteA left the width as it was, so a wide sprite showed at 16) | HRM (AGA's sprite fetch); test |
 | GetSprite of a sprite that is taken, or -1 with none free | -1 | documented |
 | AllocSpriteDataA defaults | num -1, height from the bitmap, word width 1, posctldata 8-aligned in Chip RAM | ABI test (SPRDATA) |
 | GetExtSpriteA with old-format data and no OutputHeight | NULL: old data does not say how tall it is | ABI test |
@@ -118,6 +120,7 @@ For each ViewPort, it checks the picture after MakeVPort, MrgCop and LoadView, a
 The harness also checks:
 
 - The database, monitors, VideoControl, sprites, the beam and WaitTOF.
+- Sprites 16, 32 and 64 pixels wide through a model of the sprite DMA (control words, data words at FMODE's width, HSTART to 35 ns): every pixel where it should be, through GetExtSpriteA and ChangeExtSpriteA, and on a hires ViewPort at an odd x; an attached pair at 64; OCS and ECS refusing them.
 - The fetch per chipset: DimensionInfo's MaxDepth for each kind of mode; MakeVPort's answer for lores, hires and super hires at depths 1 to 8, plain and laced; and the DDFSTRT, DDFSTOP, modulos, BPLCON1 and FMODE it sets. Also SysInfo 4.4's screen (640 super hires pixels, 3 planes: 4×, 0x38-0x80), a scrolled 8-plane hires screen, bitmaps off a wider fetch's width, and FMODE taking a 32-pixel sprite's width in a shown View.
 - Running out of memory, and all memory given back.
 - The side-by-side mode.
@@ -136,7 +139,7 @@ Result (m68k-linux-gnu-g++ 13.3.0, qemu-m68k 8.2.2, seed 20261013, 120 scenes, 2
 
 ## Not yet
 
-- Wide sprites: SPRITEA_Width 32 and 64 are allocated, but shown at 16.
+- A 16-pixel sprite's data shown while the width is 32 or 64 (another program's wide sprite) is read at that width: graphics.library does not convert it.
 - Lores at 2× and 4×, and hires at 4×: not used (lores shows 8 planes at 1×). Their DDFSTOP rule differs (the cycle DDFSTOP falls in and one more), and the test's machine models it only as the AGA runtime does.
 - DIWHIGH (windows past line 511 or ECS's extended horizontal range) and the productivity, VGA and other monitors' beam programming. The database has only the default, NTSC and PAL monitors.
 - Monitor drivers from DEVS:Monitors (the private AddDisplayInfo slots) and DTAG_VEC.
