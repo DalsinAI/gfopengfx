@@ -22,6 +22,7 @@ This directory is the display area of GFOpenGfx's `graphics.library` (see `libra
 | `build-amiga.sh` | Builds `DisplayABITest` with the os32-gcc16 stove. |
 | `tests/m68k/test_gfx_display.sh` | The qemu test (below). |
 | `tests/DisplayABITest.c` | One script run through OS 3.2's graphics.library and then through gfopengfx.library, compared line by line. `PROBE` prints OS 3.2's answers only. |
+| `tests/MonitorProbe.c` | On any ROM, after the monitor drivers have run: every MonitorSpec, every record of the database (MON= one monitor's, by ID), and one mode's screen with its copper list (ID=, FRONT). `build-amiga.sh` builds it. Its OS 3.2.3 output is in `tests/m68k/display_os323_*.txt`. |
 
 ## How a ViewPort becomes copper
 
@@ -36,24 +37,35 @@ On AGA the colours are loaded bank by bank: BPLCON3 with the bank number, the hi
 MrgCop gathers every visible ViewPort's DspIns, SprIns, ClrIns and UCopIns:
 
 - DspIns WAITs are frame lines. The other lists' WAITs count from the ViewPort's top.
-- It sorts them stably by beam position and adds the `0xFFDF` wait before line 256.
+- It sorts them stably by beam position and adds the `0xFFDF` wait before line 256, and again before line 512 (a 31 kHz monitor's frame is longer than 512 lines).
 - It writes one hardware list per field. A laced View gets a long-frame list and a short-frame list.
 - Lists that are big enough are reused while the View is not on display. A View on display always gets new lists, since the copper may be running the old ones; they are switched to at the next vertical blank, and the old ones are freed after it.
 
 ScrollVPort, ChangeVPBitMap and colour changes (`gfx_hook_vp_colors`) rewrite the gap block in place in each hardware list. They do not need a new MrgCop.
 
-The copper starts at copinit, which is in Chip RAM: FMODE, a blank window, BPLCON2, the eight sprite pointers, then a jump to COP2LC, which holds the View's list for the coming field. LoadView sets COP1LC and COP2LC, and also BEAMCON0 on ECS and AGA. The vertical blank server picks a laced View's list from VPOSR's LOF bit.
+The copper starts at copinit, which is in Chip RAM: FMODE, a blank window, BPLCON2, the eight sprite pointers, then a jump to COP2LC, which holds the View's list for the coming field. LoadView sets COP1LC and COP2LC, and also BEAMCON0 on ECS and AGA; for a driver's monitor with a SpecialMonitor it calls the driver's `do_monitor` instead, once when the monitor changes, which programs the beam (see below). The vertical blank server picks a laced View's list from VPOSR's LOF bit.
 
 The horizontal position follows the HRM:
 
 - Lores data shows from 2·DDFSTRT+17, and hires and super hires from 2·DDFSTRT+9 (in lores pixels).
 - AGA's wider fetch (FMODE bits 0-1) takes 2 or 4 words of each plane a cycle. AGA uses the widest fetch the ViewPort's bitmaps allow: planes and rows on 64 bits give 4× (FMODE 3), on 32 bits 2× (FMODE 1), else 1×. This leaves the most chip bus cycles to the CPU and the blitter. A ViewPort deeper than the 1× fetch shows (hires over 4 planes, super hires over 2) needs 2× (hires) or 4× (super hires), so every resolution shows 8 planes on AGA; with its bitmap off that width MakeVPort answers MVP_NO_DISPLAY. AllocBitMap's displayable bitmaps are on 64 bits on AGA.
-- The fetch cycle is 8 colour clocks, except lores at 2× (16) and 4× (32) and hires at 4× (16). At 8 clocks DDFSTOP is the last cycle's start. At 16 and 32 the fetch runs to the end of the cycle DDFSTOP falls in and one cycle more, so DDFSTOP is 8 clocks into the last cycle but one, and a fetch is at least 2 cycles: a 320 pixel lores screen at 4× fetches 0x38-0xA0, a 640 pixel hires screen 0x38-0xC0.
-- At 2× and 4× the data shows from 2·DDFSTRT+17, so a full screen of any resolution fetches from 0x38. DDFSTRT is then on 8 clocks and each playfield's first fetch on its width, and BPLCON1 (AGA's 8 bits, up to 64 lores pixels) carries the rest. A wider fetch that would start before 0x18 (the HRM's first DDFSTRT; a ViewPort at the left edge, scrolled) falls back to a narrower one.
+- The fetch cycle is 8 colour clocks, except lores at 2× (16) and 4× (32) and hires at 4× (16). DDFSTOP is the last cycle's start at any width (HRM; and OS 3.2.3's DblPAL Low Res, hires at 4×: 0x18-0x68 for 6 cycles).
+- At 2× and 4× the data shows from 2·DDFSTRT+17, so a full screen of any resolution fetches from 0x38. As in OS 3.2.3's lists, DDFSTRT is then a whole number of cycles after 0x18, and the cycle that would start at the window's right edge is fetched too: a 640 pixel PAL High Res screen at 4× fetches 0x38-0xD8 (11 cycles of 64 pixels, BPL1MOD -8), as OS 3.2.3's. Each playfield's first fetch is on its width, and BPLCON1 (AGA's 8 bits, up to 64 lores pixels) carries the rest. A wider fetch that would start before 0x18 (the HRM's first DDFSTRT; a ViewPort at the left edge, scrolled) falls back to a narrower one.
+- On ECS and AGA every ViewPort's first block sets DIWHIGH after DIWSTRT and DIWSTOP (whose writes turn it off), so the window's bits 8-10 are exact: OS 3.2.3's PAL Workbench writes 0x2C81, 0x2CC1, 0x2100, and so do we. OCS keeps the implied bits (V8 of the start 0, of the stop not V7, H8 of the stop 1).
 - Every AGA ViewPort's first block sets FMODE: its fetch with copinit's sprite width. A sprite width change (ChangeExtSpriteA) rewrites the shown ViewPorts' blocks.
 - Each playfield's scroll (BPLCON1) and the fetch start are worked out so the first word fetched is the one holding RxOffset at DIW start.
 - DDFSTOP covers the window, in whole fetch units, and is clamped at 0xD8.
 - OCS and ECS scroll in lores pixels, so a hires RxOffset is rounded down to an even number.
+
+## 31 kHz monitors: Multiscan, DblNTSC and DblPAL
+
+These are as OS 3.2.3's drivers make them, measured with `tests/MonitorProbe.c` on an OS 3.2.3 A1200 lab (3 November 2026). The measurements are kept in `tests/m68k/display_os323_modes.txt` (every record) and `display_os323_screens.txt` (the MonitorSpecs and the copper lists of six screens).
+
+- **The database.** A driver adds its own MonitorSpec to GfxBase->MonitorList. While "multiscan.monitor", "DblNTSC.monitor" or "DblPAL.monitor" is there, its modes are in the database: Multiscan 24 (0x31000), DblNTSC 16 (0x91000), DblPAL 16 (0xA1000). Each has OS 3.2.3's DisplayInfo, DimensionInfo, MonitorInfo and NameInfo, made by rules from the measured records. MonitorInfo's rows, colour clocks and first row are the driver's MonitorSpec's. With no driver, the database is as before (90 modes).
+- **The modes.** Every line is progressive. A ViewPort's LACE means "No Flicker", one row a line. Without LACE each row is shown on two lines: FMODE's BSCAN2, with BPL1MOD going back over the row and BPL2MOD on to the next. Sprites are scan doubled (SSCAN2). BPLCON3 has EXTBLKEN, and hires sprites unless the ColorMap says otherwise. DblNTSC's and DblPAL's bitplanes run a resolution faster than the mode says (Low Res is hires bitplanes at 70 ns); Multiscan's run at the resolution the mode says.
+- **The beam.** HTOTAL, the syncs, the blanks and BEAMCON0 (0x1B88) are the driver's: LoadView calls its SpecialMonitor's `do_monitor` when the View's monitor changes. A built-in monitor still gets BEAMCON0 from its MonitorSpec.
+- **Checked against OS 3.2.3.** For DblPAL High Res No Flicker and Low Res, Multiscan Productivity, DblNTSC High Res No Flicker, and PAL High Res laced and plain, MakeVPort sets OS 3.2.3's DIWSTRT, DIWSTOP, DIWHIGH, DDFSTRT, DDFSTOP, BPLCON1, both modulos, FMODE, BPLCON0 and BPLCON3.
+- **Known differences** from those lists. On PAL, OS 3.2.3's BPLCON0 has no ECSENA, its BPLCON3 asks for lores sprites (0x0C40) where ours leaves ECS's default, and its BPLCON2 has KILLEHB at any depth (ours only at 6 planes, where it matters).
 
 ## Edge cases
 
@@ -104,7 +116,7 @@ The horizontal position follows the HRM:
 
 ## The tests
 
-`tests/m68k/test_gfx_display.sh` builds the core with m68k-linux-gnu-g++ 13.3 for the 68040 at -O0 and -O2 (until 17 October 2026 also for the 68000 and 68020). It runs each build under qemu-m68k 8.2 on a simulated machine: exec's memory, the custom registers, a copper running the lists four colour clocks per instruction, and an Agnus/Denise/Lisa that shows the bitplanes line by line, in 35 ns (super hires) pixels. The display models OCS, ECS and AGA; lores, hires and super hires; AGA's 1×, 2× and 4× fetches; HAM6, HAM8, EHB, dual playfield, PF2OF, BPLAM and LOCT. A line fetched against the chips' rules fails the test: more planes than its fetch shows, a DDFSTRT before 0x18, a DDFSTOP off the fetch's cycle, or a pointer or modulo off a wider fetch's width.
+`tests/m68k/test_gfx_display.sh` builds the core with m68k-linux-gnu-g++ 13.3 for the 68040 at -O0 and -O2 (until 17 October 2026 also for the 68000 and 68020). It runs each build under qemu-m68k 8.2 on a simulated machine: exec's memory, the custom registers, a copper running the lists four colour clocks per instruction, and an Agnus/Denise/Lisa that shows the bitplanes line by line, in 35 ns (super hires) pixels. The display models OCS, ECS and AGA; lores, hires and super hires; AGA's 1×, 2× and 4× fetches; HAM6, HAM8, EHB, dual playfield, PF2OF, BPLAM and LOCT. The window follows DIWHIGH when it is written. A line fetched against the chips' rules fails the test: more planes than its fetch shows, a DDFSTRT before 0x18, a DDFSTOP off the fetch's cycle, or a pointer or modulo off a wider fetch's width.
 
 `test_gfx_display_model.py` is written separately from the library and does not model the copper. It makes scenes and says, from the documented View and ViewPort rules, what each ViewPort must show. The scenes cover:
 
@@ -119,7 +131,8 @@ For each ViewPort, it checks the picture after MakeVPort, MrgCop and LoadView, a
 The harness also checks:
 
 - The database, monitors, VideoControl, sprites, the beam and WaitTOF.
-- The fetch per chipset: DimensionInfo's MaxDepth for each kind of mode; MakeVPort's answer for lores, hires and super hires at depths 1 to 8, plain and laced; and the DDFSTRT, DDFSTOP, modulos, BPLCON1 and FMODE it sets. Also SysInfo 4.4's screen (640 super hires pixels, 3 planes: 4×, 0x38-0x80), a scrolled 8-plane hires screen at 4×, lores on 32 bits at 2×, a lores screen at the left edge scrolled back to 1×, bitmaps off a wider fetch's width, and FMODE taking a 32-pixel sprite's width in a shown View.
+- Multiscan, DblNTSC and DblPAL (`monitors31`). The drivers' MonitorSpecs and SpecialMonitors are added to MonitorList as a driver does. Every one of their 56 modes' records is printed as MonitorProbe prints it, and the script compares them line by line with OS 3.2.3's (`display_os323_modes.txt`). The check also covers MakeVPort's registers for OS 3.2.3's six screens, MrgCop's waits through lines 255 and 511, LoadView calling `do_monitor` once, and the modes going when the driver goes.
+- The fetch per chipset: DimensionInfo's MaxDepth for each kind of mode; MakeVPort's answer for lores, hires and super hires at depths 1 to 8, plain and laced; and the DDFSTRT, DDFSTOP, modulos, BPLCON1 and FMODE it sets. Also SysInfo 4.4's screen (640 super hires pixels, 3 planes: 4×, 0x38-0x88), a scrolled 8-plane hires screen at 4×, lores on 32 bits at 2×, a lores screen at the left edge scrolled back to 1×, bitmaps off a wider fetch's width, and FMODE taking a 32-pixel sprite's width in a shown View.
 - Running out of memory, and all memory given back.
 - The side-by-side mode.
 
@@ -129,7 +142,7 @@ After that, the script:
 - Compiles `display_lvo.c` as C.
 - Runs nm checks: the core calls nothing but libgcc, and there is no .data, .bss or C++ runtime.
 
-Result (m68k-linux-gnu-g++ 13.3.0, qemu-m68k 8.2.2, seed 20261013, 120 scenes, 3 November 2026): every build shows the same 855 ViewPort pictures as the model, with 3818 checks and 0 failed. Seeds 7 (400 scenes) and 99 (300) also pass.
+Result (m68k-linux-gnu-g++ 13.3.0, qemu-m68k 8.2.2, seed 20261013, 120 scenes, 3 November 2026): every build shows the same 855 ViewPort pictures as the model, with 3847 checks and 0 failed, and the 56 records are OS 3.2.3's. Seed 7 (300 scenes) also passes.
 
 `tests/ScreenDepthProbe.c` runs on an Amiga with any ROM. It prints the MaxDepth of lores, hires and super hires, whether SysInfo 4.4's screen and its neighbours open, and a table of every resolution and depth from 1 to 8, plain and laced. With MODES and DEPTH it holds one screen on show, with a bar for each colour, for a screenshot. `library/display/build-amiga.sh` builds it.
 
@@ -138,7 +151,9 @@ Result (m68k-linux-gnu-g++ 13.3.0, qemu-m68k 8.2.2, seed 20261013, 120 scenes, 3
 ## Not yet
 
 - Wide sprites: SPRITEA_Width 32 and 64 are allocated, but shown at 16.
-- DIWHIGH (windows past line 511 or ECS's extended horizontal range) and the productivity, VGA and other monitors' beam programming. The database has only the default, NTSC and PAL monitors.
+- Euro72, Euro36, Super72 and A2024: their drivers' modes are not in the database (as with any other driver, until the AddDisplayInfo calls are done).
+- The test's machine shows 15 kHz frames only. The 31 kHz modes are checked against OS 3.2.3's registers, not pixel by pixel.
+- `do_monitor` is called as a C function with the MonitorSpec on the stack (`SpecialMonitor`'s declared type). OS 3.2.3's own call has not been seen.
 - Monitor drivers from DEVS:Monitors (the private AddDisplayInfo slots) and DTAG_VEC.
 - `gfx_hook_vsprites`: SprIns from gels' VSprites is still the stub.
 - copinit's wait14 is a NOOP, not a wait at line 10.

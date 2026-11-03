@@ -106,6 +106,7 @@ geom view_geom(gfx_env *env, gd_view *view)
     g.pal = ms ? ms->total_rows > 280 : (base(env)->displayflags & GFX_PAL) != 0;
     g.total_rows = ms ? ms->total_rows : (g.pal ? 312 : 262);
     g.min_row = ms ? ms->min_row : (g.pal ? 29 : 21);
+    g.scan = scan_of(ms);
     return g;
 }
 
@@ -139,7 +140,8 @@ struct layout {
     int step;                           /* rows per line */
     int ddfstrt, ddfstop, words;
     uint16_t fmode;                     /* FMODE's bitplane bits: 0 (1x), 1 (2x), 3 (4x) */
-    uint16_t diwstrt, diwstop;
+    uint16_t diwstrt, diwstop, diwhigh;
+    int mod1;                           /* BPL1MOD (a row on two lines: back over it) */
     playfield pf[2];
     int npf;
     int depth;
@@ -157,11 +159,16 @@ uint32_t vp_layout(gfx_env *env, gd_view *view, gd_viewport *vp, layout &L)
     if (!ri || !ri->bitmap) return GD_MVP_NO_DISPLAY;
 
     const uint16_t modes = vp->modes;
-    const bool shres = (modes & GD_SUPERHIRES) != 0;
-    const bool hires = !shres && (modes & GD_HIRES);
+    /* a 31 kHz monitor (geom::scan): DblNTSC's and DblPAL's bitplanes a
+     * resolution faster than the ViewPort's modes; LACE one row a line, no
+     * LACE each row on two lines (ly), never interlaced */
+    const bool dblres = g.scan == SCAN_DBL;
+    const bool shres = (modes & (dblres ? GD_HIRES : GD_SUPERHIRES)) != 0;
+    const bool hires = !shres && (dblres || (modes & GD_HIRES));
     const int p = shres ? 1 : hires ? 2 : 4;        /* 35ns pixels per ViewPort pixel */
     const int res = 4 / p;
-    const bool lace = (modes & GD_LACE) != 0;
+    const bool lace = !g.scan && (modes & GD_LACE);
+    const int ly = g.scan && !(modes & GD_LACE) ? 2 : 1;
     const bool dpf = (modes & GD_DUALPF) && ri->next && ri->next->bitmap
                      && !(cm && (cm->auxflags & GD_CMAF_DUALPF_DISABLE));
     const bool isaga = aga(env);
@@ -241,6 +248,9 @@ uint32_t vp_layout(gfx_env *env, gd_view *view, gd_viewport *vp, layout &L)
         }
     } else if (isaga)
         c3 |= 3 << 10;
+    /* a 31 kHz monitor: EXTBLKEN (its programmed blank), and hires sprites
+     * unless the ColorMap asks (OS 3.2.3's lists: 0x0C81) */
+    if (g.scan) c3 |= ((!cm || cm->type < GFX_COLORMAP_TYPE_V36 || cm->spriteresolution == 0xFF) ? 0x80 : 0) | 0x0001;
     L.con3 = c3;
     L.con4 = cm ? static_cast<uint16_t>((cm->bp_0_base & 0xFF) << 8 | ((cm->spritebase_even >> 4) & 15) << 4
                                         | ((cm->spritebase_odd >> 4) & 15))
@@ -263,7 +273,7 @@ uint32_t vp_layout(gfx_env *env, gd_view *view, gd_viewport *vp, layout &L)
 
     /* vertical: the ViewPort's rows, its DisplayClip, the monitor */
     const int h = vp->dheight, w = vp->dwidth;
-    const int top = (view ? view->dyoffset : VIEW_Y) + (lace ? (vp->dyoffset >> 1) : vp->dyoffset);
+    const int top = (view ? view->dyoffset : VIEW_Y) + (lace ? (vp->dyoffset >> 1) : vp->dyoffset * ly);
     if (top >= g.total_rows) return GD_MVP_OFF_BOTTOM;
     int r0 = 0, r1 = h, x0 = 0, x1 = w;
     gd_vpextra *vpe = cm ? static_cast<gd_vpextra *>(cm->vpe) : nullptr;
@@ -281,10 +291,11 @@ uint32_t vp_layout(gfx_env *env, gd_view *view, gd_viewport *vp, layout &L)
         }
         if (rlo >= r1) continue;
         int n = (r1 - 1 - rlo) / rstep + 1;
-        int lfirst = top + (lace ? rlo >> 1 : rlo), llast = lfirst + n;
+        int lfirst = top + (lace ? rlo >> 1 : rlo * ly), llast = lfirst + n * ly;
         if (lfirst < g.min_row) {
-            rlo += (g.min_row - lfirst) * rstep;
-            lfirst = g.min_row;
+            int k = (g.min_row - lfirst + ly - 1) / ly;     /* rows above the first line */
+            rlo += k * rstep;
+            lfirst += k * ly;
         }
         if (llast > g.total_rows) llast = g.total_rows;
         if (lfirst >= llast) continue;
@@ -300,7 +311,8 @@ uint32_t vp_layout(gfx_env *env, gd_view *view, gd_viewport *vp, layout &L)
     int xlo = imax(vx0 + x0 * p, 4 * LEGAL_X0), xhi = imin(vx0 + x1 * p, 4 * LEGAL_X1);
     if (xlo >= xhi || w <= 0 || h <= 0) L.visible[0] = L.visible[1] = false;
     if (!L.visible[0] && !L.visible[1]) return GD_MVP_OK;
-    const int hstart = xlo / 4, hstop = (xhi + 3) / 4;
+    const int hstart = xlo / 4;
+    int hstop = (xhi + 3) / 4;
     /* words of a plane in 8 colour clocks, whatever the fetch */
     const int per8 = shres ? 4 : hires ? 2 : 1;
     for (;; fw >>= 1) {
@@ -329,7 +341,9 @@ uint32_t vp_layout(gfx_env *env, gd_view *view, gd_viewport *vp, layout &L)
             L.pf[i].w0 = (S[i] - col0) / blk * fw;
             smin = imin(smin, S[i]);
         }
-        L.ddfstrt = floordiv(smin - 4 * c, 8 * gran) * gran;
+        /* at 2x and 4x a whole number of cycles after 0x18, as OS 3.2.3 */
+        L.ddfstrt = fw == 1 ? floordiv(smin - 4 * c, 8 * gran) * gran
+                            : 0x18 + floordiv(floordiv(smin - 4 * c, 8) - 0x18, u) * u;
         const int base0 = 4 * (2 * L.ddfstrt + c);
         for (int i = 0; i < L.npf; i++) {
             int d = S[i] - base0;
@@ -339,26 +353,29 @@ uint32_t vp_layout(gfx_env *env, gd_view *view, gd_viewport *vp, layout &L)
             }
             L.pf[i].delay = d;
         }
-        /* n cycles cover the window. DDFSTOP: at 8 clocks the last cycle's
-         * start (HRM); at 16 and 32 the fetch runs to the end of the cycle
-         * DDFSTOP falls in and one cycle more, so DDFSTOP is 8 clocks into
-         * the last but one (a 320 pixel lores screen at 4x: 0x38-0xA0),
-         * and there are at least 2. DDFSTOP stays at 0xD8 or before (a
-         * wider fetch reaches as far right as a narrower one) */
-        const int words = floordiv(4 * hstop - 1 - base0, blk) * fw + fw;
-        const int nmin = u > 8 ? 2 : 1;
-        int n = imax((words + wpc - 1) / wpc, nmin);
-        auto stop = [&](int k) { return L.ddfstrt + (u > 8 ? u * (k - 2) + 8 : 8 * (k - 1)); };
-        while (n > nmin && stop(n) > 0xD8) n--;
+        /* n cycles cover the window, DDFSTOP the last cycle's start (HRM;
+         * and at 16 and 32 clocks as OS 3.2.3's lists: DblPAL Low Res, hires
+         * at 4x, 0x18-0x68 for 6 cycles). At 2x and 4x the cycle that would
+         * start at the window's right edge is fetched too, as OS 3.2.3's
+         * (PAL High Res: 0x38-0xD8, 11 cycles of 64 pixels). DDFSTOP stays
+         * at 0xD8 or before (a wider fetch reaches as far right as a
+         * narrower one) */
+        const int words = floordiv(4 * hstop - (fw > 1 ? 0 : 1) - base0, blk) * fw + fw;
+        int n = (words + wpc - 1) / wpc;
+        while (n > 1 && L.ddfstrt + u * (n - 1) > 0xD8) n--;
         /* a wider fetch that would start before 0x18 (the HRM's first
          * DDFSTRT): a narrower one */
         if (L.ddfstrt < 0x18 && fw > need) continue;
         L.words = n * wpc;
-        L.ddfstop = stop(n);
+        L.ddfstop = L.ddfstrt + u * (n - 1);
         break;
     }
-    L.fmode = static_cast<uint16_t>(fw - 1);
+    /* a 31 kHz monitor's sprites are scan doubled (SSCAN2); a row on two
+     * lines is fetched twice (BSCAN2: BPL1MOD on the first line goes back
+     * over it, BPL2MOD on the second on to the next row), as OS 3.2.3 */
+    L.fmode = static_cast<uint16_t>((fw - 1) | (g.scan ? 0x8000 : 0) | (ly == 2 ? 0x4000 : 0));
     for (int i = 0; i < L.npf; i++) L.pf[i].mod = L.pf[i].bm->bytesperrow * L.step - 2 * L.words;
+    L.mod1 = ly == 2 ? -2 * L.words : L.pf[0].mod;
     auto enc = [isaga](int d, int sh) -> uint16_t {
         if (!isaga) return static_cast<uint16_t>(((d >> 2) & 15) << sh);
         return static_cast<uint16_t>((((d >> 2) & 15) << sh) | ((d & 3) << (sh + 8)) | (((d >> 6) & 3) << (sh + 10)));
@@ -371,10 +388,19 @@ uint32_t vp_layout(gfx_env *env, gd_view *view, gd_viewport *vp, layout &L)
             vstart = imin(vstart, L.first[f]);
             vstop = imax(vstop, L.last[f]);
         }
-    vstart = imin(vstart, 255);
-    vstop = imax(vstop, 128);
-    L.diwstrt = static_cast<uint16_t>((vstart & 0xFF) << 8 | (imin(hstart, 0xFF) & 0xFF));
-    L.diwstop = static_cast<uint16_t>((vstop & 0xFF) << 8 | (imax(hstop, 0x100) & 0xFF));
+    /* ECS and AGA: DIWHIGH holds the window's bits 8-10, so it is exact
+     * (written after DIWSTRT and DIWSTOP, whose writes turn it off; OS
+     * 3.2.3's PAL Workbench: 0x2C81, 0x2CC1, 0x2100). OCS: V8 of the start
+     * is 0 and of the stop is not V7, H8 of the stop is 1 */
+    if (!ecs_denise(env)) {
+        vstart = imin(vstart, 255);
+        vstop = imax(vstop, 128);
+        hstop = imax(hstop, 0x100);
+    }
+    L.diwstrt = static_cast<uint16_t>((vstart & 0xFF) << 8 | (imin(hstart, 0x1FF) & 0xFF));
+    L.diwstop = static_cast<uint16_t>((vstop & 0xFF) << 8 | (hstop & 0xFF));
+    L.diwhigh = static_cast<uint16_t>(((vstart >> 8) & 7) | ((hstart >> 8) & 1) << 5 | ((vstop >> 8) & 7) << 8
+                                      | ((hstop >> 8) & 1) << 13);
     return GD_MVP_OK;
 }
 
@@ -418,9 +444,10 @@ void emit_vp(gfx_env *env, gd_viewport *vp, const layout &L, emitter &e, int gap
     }
     e.move(GD_DIWSTRT, L.diwstrt);
     e.move(GD_DIWSTOP, L.diwstop);
+    if (ecs) e.move(GD_DIWHIGH, L.diwhigh);
     e.move(GD_DDFSTRT, static_cast<unsigned>(L.ddfstrt));
     e.move(GD_DDFSTOP, static_cast<unsigned>(L.ddfstop));
-    e.move(GD_BPL1MOD, static_cast<unsigned>(L.pf[0].mod));
+    e.move(GD_BPL1MOD, static_cast<unsigned>(L.mod1));
     e.move(GD_BPL2MOD, static_cast<unsigned>(L.npf == 2 ? L.pf[1].mod : L.pf[0].mod));
     for (int f = 0; f < (L.lace ? 2 : 1); f++) {
         int16_t fl = L.lace ? (f ? NT_LOF : NT_SHT) : 0;
@@ -631,7 +658,7 @@ int gather(gfx_env *env, gd_view *view, segment *out)
 int write_field(segment *seg, int nseg, int field, int rows, uint16_t *out)
 {
     int n = 0;
-    bool crossed = false;
+    int crossed = 0;                    /* the 256 line wraps passed */
     auto put = [&](unsigned a, unsigned b) {
         if (out) {
             out[2 * n] = static_cast<uint16_t>(a);
@@ -645,11 +672,11 @@ int write_field(segment *seg, int nseg, int field, int rows, uint16_t *out)
         if (s.flags & skip) continue;
         int v = s.v < 0 ? 0 : s.v;
         if (v > rows) continue;         /* below the frame: CEND's 10000 and the like */
-        if (v >= 256 && !crossed) {
-            put(0xFFDF, 0xFFFE);        /* line 255 at its end, then into line 256 */
+        while (v >= 256 * (crossed + 1)) {
+            put(0xFFDF, 0xFFFE);        /* line 255 (511) at its end, then into line 256 (512) */
             put(GD_NOOP, 0);
             put(GD_NOOP, 0);
-            crossed = true;
+            crossed++;
         }
         if (s.dsp && out) {
             if (field) s.dsp->copsstart = out + 2 * n;
@@ -876,10 +903,18 @@ void gd_LoadView(gfx_env *env, gd_view *view)
     } else {
         gb->loflist = gb->shflist = nullptr;
     }
-    /* the View's monitor (ECS Agnus and up: PAL or NTSC beam) */
+    /* the View's monitor (ECS Agnus and up: PAL or NTSC beam). A driver's
+     * monitor with a SpecialMonitor programs the beam itself (its
+     * do_monitor: HTOTAL, the syncs and blanks from its intervals, and
+     * BEAMCON0), called when the monitor changes */
     gd_monitorspec *ms = monitor_of_view(env, view);
     if (ms && (gb->chiprevbits0 & GFX_GFXF_HR_AGNUS)) {
-        put(env, GD_BEAMCON0, ms->beamcon0);
+        gd_specialmonitor *sm = ms->special;
+        if (sm && sm->do_monitor) {
+            if (ms != gb->current_monitor && s->hw)
+                reinterpret_cast<int32_t (*)(gd_monitorspec *)>(sm->do_monitor)(ms);
+        } else
+            put(env, GD_BEAMCON0, ms->beamcon0);
         gb->current_monitor = ms;
         gb->current_tot_rows = ms->total_rows;
         gb->current_tot_cclks = ms->total_colorclocks;
