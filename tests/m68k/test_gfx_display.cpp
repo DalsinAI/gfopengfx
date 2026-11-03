@@ -7,8 +7,9 @@
  * with BPLCON1's scroll, HAM6, HAM8, EHB, dual playfield, AGA's palette
  * banks, LOCT, PF2OF and BPLAM, in lores, hires and superhires, with AGA's
  * wider fetches (FMODE bits 0-1). A line fetched against the chips' rules
- * (more planes than its fetch shows, a DDFSTOP off the fetch's cycle, a
- * pointer or modulo off a wider fetch's width) is counted as a failure.
+ * (more planes than its fetch shows, a DDFSTRT before 0x18, a DDFSTOP off
+ * the fetch's cycle, a pointer or modulo off a wider fetch's width) is
+ * counted as a failure.
  * The registers a line uses are taken at colour clock 0x20, before any
  * fetch. The frame is kept in 35ns (superhires) pixels; what it shows is
  * hashed over each ViewPort's rectangle and compared with model.py's
@@ -190,9 +191,9 @@ static void render_line(int v)
     if (!(planes > 0 && v >= vstart && v < vstop)) return;
     /* the resolution and the fetch (AGA's FMODE bits 0-1: 1x, 2x, 2x, 4x).
      * The planes a fetch shows, and the colour clocks of DDFSTOP's cycle:
-     * 8 at 1x, and at 2x and 4x for hires and superhires; lores at 2x and
-     * 4x is 16 and 32 (the runtime's rule: the cycle DDFSTOP falls in and
-     * one more). Data shows from 2 * DDFSTRT + 17 lores pixels in lores,
+     * 8 at 1x, at 2x for hires and at 2x and 4x for superhires; lores at
+     * 2x and 4x is 16 and 32, hires at 4x 16 (the runtime's rule: the
+     * cycle DDFSTOP falls in and one more). Data shows from 2 * DDFSTRT + 17 lores pixels in lores,
      * + 9 in hires and superhires at 1x, + 17 at 2x and 4x. */
     const bool shres = M.chip > 0 && (con0 & 0x40) != 0, hires = !shres && (con0 & 0x8000) != 0;
     const int res = shres ? 2 : hires ? 1 : 0;
@@ -202,7 +203,7 @@ static void render_line(int v)
     if (planes > ((aga && !fi && !res) ? 8 : maxp[fi][res])) misfetch++;
     const int u = unit[fi][res];
     int dstart = M.reg[GD_DDFSTRT >> 1] & (res || fi ? 0xFC : 0xF8), dstop = M.reg[GD_DDFSTOP >> 1] & 0xFC;
-    if (fi && (dstart & 7)) misfetch++;
+    if ((fi && (dstart & 7)) || dstart < 0x18) misfetch++;   /* the HRM's first DDFSTRT */
     int cycles = 0, x = dstop - dstart;
     if (x >= 0) {
         if (u == 8) {
@@ -933,14 +934,16 @@ static void fetch_modes(int chip)
                 if (r != (ok ? GD_MVP_OK : GD_MVP_NO_DISPLAY))
                     printf("  chip %d %s%s depth %d: MakeVPort %lu\n", chip, rn[res], lace ? " laced" : "", depth, (unsigned long)r);
                 if (r == GD_MVP_OK) {
-                    /* at 1x: lores 0x38-0xD0, hires and superhires 0x3C-0xD4
-                     * (HRM); hires at 2x and superhires at 4x: 0x38-0xD0
-                     * (their data shows from 2 * DDFSTRT + 17); the modulo the
-                     * rows the fetch skips: 0, or a row when laced */
-                    int wide = (res == 1 && depth > 4) || (res == 2 && depth > 2);
+                    /* OCS and ECS at 1x: lores 0x38-0xD0, hires and
+                     * superhires 0x3C-0xD4 (HRM). AGA, the bitmap on 64 bits:
+                     * 4x, whose data shows from 2 * DDFSTRT + 17, so from
+                     * 0x38; lores to 0xA0 (5 cycles of 32 clocks), hires to
+                     * 0xC0 (10 of 16), superhires to 0xD0 (20 of 8). The
+                     * modulo the rows the fetch skips: 0, or a row when laced */
                     regs g = dsp_regs(&vp);
-                    uint16_t ws = (res && !wide) ? 0x3C : 0x38, we = (uint16_t)(ws + 0x98);
-                    uint16_t wm = (uint16_t)(lace ? rb : 0), wf = (uint16_t)(chip < 2 ? 0xEEEE : !wide ? 0 : res == 1 ? 1 : 3);
+                    uint16_t ws = (res && chip < 2) ? 0x3C : 0x38;
+                    uint16_t we = (uint16_t)(chip < 2 ? ws + 0x98 : res == 0 ? 0xA0 : res == 1 ? 0xC0 : 0xD0);
+                    uint16_t wm = (uint16_t)(lace ? rb : 0), wf = (uint16_t)(chip < 2 ? 0xEEEE : 3);
                     bool same = g.ddfstrt == ws && g.ddfstop == we && g.mod1 == wm && g.mod2 == wm && g.con1 == 0 && g.fmode == wf;
                     CHECK(same, "the fetch per resolution and depth");
                     if (!same)
@@ -963,15 +966,37 @@ static void fetch_modes(int chip)
         CHECK(gd_MakeVPort(&E, &v, &vp) == GD_MVP_OK, "SysInfo's screen");
         regs g = dsp_regs(&vp);
         CHECK(g.ddfstrt == 0x38 && g.ddfstop == 0x80 && g.mod1 == 0 && g.mod2 == 0 && g.fmode == 3, "SysInfo's screen: 4x, 0x38-0x80");
-        /* hires, 8 planes, scrolled 5 pixels: the fetch a cycle earlier,
-         * 54 superhires pixels of delay (PF1H 13 and PF1H0-1 2), 42 words */
+        /* hires, 8 planes, scrolled 5 pixels: 4x, the fetch 8 clocks
+         * earlier, 54 superhires pixels of delay (PF1H 13 and PF1H0-1 2),
+         * 11 cycles of 4 words */
         ri.bitmap = plain_bm(8, 80, 32, 0);
         ri.rxoffset = 5;
         vp.modes = GD_HIRES;
         CHECK(gd_MakeVPort(&E, &v, &vp) == GD_MVP_OK, "hires 8 planes scrolled");
         g = dsp_regs(&vp);
-        CHECK(g.ddfstrt == 0x30 && g.ddfstop == 0xD0 && g.mod1 == 0xFFFC && g.con1 == 0x22DD && g.fmode == 1, "hires 8 planes scrolled: 0x30-0xD0, BPLCON1 0x22DD");
+        CHECK(g.ddfstrt == 0x30 && g.ddfstop == 0xC8 && g.mod1 == 0xFFF8 && g.con1 == 0x22DD && g.fmode == 3, "hires 8 planes scrolled: 4x, 0x30-0xC8, BPLCON1 0x22DD");
         ri.rxoffset = 0;
+        /* lores, the bitmap on 32 bits: 2x, 10 cycles of 16 clocks */
+        ri.bitmap = plain_bm(4, 44, 32, 4);
+        vp.modes = 0;
+        vp.dwidth = 320;
+        CHECK(gd_MakeVPort(&E, &v, &vp) == GD_MVP_OK, "lores on 32 bits");
+        g = dsp_regs(&vp);
+        CHECK(g.ddfstrt == 0x38 && g.ddfstop == 0xC0 && g.mod1 == 4 && g.fmode == 1, "lores on 32 bits: 2x, 0x38-0xC0");
+        /* lores at the left edge (0x51) scrolled 60 pixels: 4x and 2x would
+         * start before 0x18, so 1x from 0x18 */
+        ri.bitmap = plain_bm(4, 64, 32, 0);
+        ri.rxoffset = 60;
+        vp.dxoffset = 0x51 - 0x81;
+        CHECK(gd_MakeVPort(&E, &v, &vp) == GD_MVP_OK, "lores scrolled at the left edge");
+        g = dsp_regs(&vp);
+        CHECK(g.ddfstrt == 0x18 && g.fmode == 0, "lores scrolled at the left edge: 1x from 0x18");
+        ri.rxoffset = 0;
+        CHECK(gd_MakeVPort(&E, &v, &vp) == GD_MVP_OK && dsp_regs(&vp).fmode == 3 && dsp_regs(&vp).ddfstrt == 0x20,
+              "lores at the left edge: 4x from 0x20");
+        vp.dxoffset = 0;
+        vp.dwidth = 640;
+        vp.modes = GD_HIRES;
         /* a wider fetch needs its planes and rows on its width */
         ri.bitmap = plain_bm(8, 82, 32, 0);
         CHECK(gd_MakeVPort(&E, &v, &vp) == GD_MVP_NO_DISPLAY, "hires 8 planes, rows of 82 bytes: no 2x");
@@ -993,7 +1018,7 @@ static void fetch_modes(int chip)
         CHECK(gd_MakeVPort(&E, &v, &vp) == GD_MVP_OK && gd_MrgCop(&E, &v) == GD_MCOP_OK, "a hires 8 plane View");
         gd_LoadView(&E, &v);
         frame(true);
-        CHECK(M.reg[GD_FMODE >> 1] == 0x0001, "the View's FMODE: 2x, 16 pixel sprites");
+        CHECK(M.reg[GD_FMODE >> 1] == 0x0003, "the View's FMODE: 4x, 16 pixel sprites");
         gfx_bitmap sb;
         memset(&sb, 0, sizeof sb);
         static uint8_t sp0[8], sp1[8];
@@ -1003,7 +1028,7 @@ static void fetch_modes(int chip)
         CHECK(e1 && e2 && gd_GetExtSpriteA(&E, e1, g0) == 0, "GetExtSpriteA 0");
         CHECK(gd_ChangeExtSpriteA(&E, &vp, e1, e2, 0) == 1, "a 32 pixel sprite");
         frame(true);
-        CHECK(M.reg[GD_FMODE >> 1] == 0x0005, "the View's FMODE: 2x, 32 pixel sprites");
+        CHECK(M.reg[GD_FMODE >> 1] == 0x0007, "the View's FMODE: 4x, 32 pixel sprites");
         gd_LoadView(&E, 0);
         gd_FreeSprite(&E, 0);
         gd_FreeSpriteData(&E, e1);
