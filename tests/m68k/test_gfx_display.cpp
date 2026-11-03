@@ -295,6 +295,50 @@ static void render_line(int v)
     stamp[v] = frameno;
 }
 
+/* Sprite DMA, when a test asks for it (spr_on): from line 25 each sprite
+ * reads its control words, the first word of each of its fetches (1 word,
+ * or AGA's 2 or 4 by FMODE bits 2-3: SPR32, SPAGEM); from VSTART a line
+ * of data each line (DATA's words, then DATB's) until VSTOP, where it
+ * reads the next control words. HSTART is in 35ns pixels: SH10-SH3 in
+ * SPRxPOS, SH2 in SPRxCTL bit 0, AGA's SH1 and SH0 in bits 4 and 3. A
+ * sprite's pixels are lores pixels (SPRES 0) and show from HSTART plus a
+ * lores pixel (graphics.library's HSTART is the View's left edge less
+ * one). They are kept apart from the bitplanes, in sprfb: the sprite's
+ * number times 4 plus its colour. */
+static bool spr_on;
+static uint8_t sprfb[LINES][FBW];
+static struct { int state, vstart, vstop, h; } SPR[8];   /* state: 0 before line 25, 1 waiting, 2 showing */
+static uint16_t rdw(uint32_t a) { const uint8_t *b = (const uint8_t *)(uintptr_t)a; return (uint16_t)(b[0] << 8 | b[1]); }
+static void sprite_line(int v)
+{
+    const bool aga = M.chip == 2;
+    static const int widths[4] = { 1, 2, 2, 4 };
+    const int W = aga ? widths[(M.reg[GD_FMODE >> 1] >> 2) & 3] : 1;
+    for (int n = 0; n < 8; n++) {
+        bool ctlnow = v == 25 || (SPR[n].state == 2 && v == SPR[n].vstop);
+        if (ctlnow) {
+            uint16_t pos = rdw(M.sprpt[n]), ctl = rdw(M.sprpt[n] + 2 * W);
+            M.sprpt[n] += 4 * W;
+            SPR[n].vstart = pos >> 8 | (ctl >> 2 & 1) << 8 | (aga ? (ctl >> 6 & 1) << 9 : 0);
+            SPR[n].vstop = ctl >> 8 | (ctl >> 1 & 1) << 8 | (aga ? (ctl >> 5 & 1) << 9 : 0);
+            SPR[n].h = (pos & 0xFF) << 3 | (ctl & 1) << 2 | (aga ? (ctl >> 4 & 1) << 1 | (ctl >> 3 & 1) : 0);
+            SPR[n].state = 1;
+        }
+        if (SPR[n].state == 1 && v == SPR[n].vstart && v != SPR[n].vstop) SPR[n].state = 2;
+        if (SPR[n].state != 2 || v >= LINES) continue;
+        uint16_t a[4], b[4];
+        for (int i = 0; i < W; i++) { a[i] = rdw(M.sprpt[n] + 2 * i); b[i] = rdw(M.sprpt[n] + 2 * (W + i)); }
+        M.sprpt[n] += 4 * W;
+        for (int i = 0; i < 16 * W; i++) {
+            int c = (a[i >> 4] >> (15 - (i & 15)) & 1) | (b[i >> 4] >> (15 - (i & 15)) & 1) << 1;
+            for (int k = 0; k < 4; k++) {
+                int x = SPR[n].h + 4 + 4 * i + k;
+                if (c && x < FBW) sprfb[v][x] = (uint8_t)(4 * n + c);
+            }
+        }
+    }
+}
+
 static gfx_env E;
 static void frame(bool lof)
 {
@@ -305,9 +349,14 @@ static void frame(bool lof)
     cop_t = 0;
     cop_halt = false;
     int lines = frame_lines();
+    if (spr_on) {
+        memset(sprfb, 0, sizeof sprfb);
+        memset(SPR, 0, sizeof SPR);
+    }
     for (int v = 0; v < lines; v++) {
         copper_run(v * 227 + 0x20);
         if (v < LINES) render_line(v);
+        if (spr_on) sprite_line(v);
     }
     copper_run(lines * 227);
     M.cpu_t = 0;
@@ -750,7 +799,10 @@ static void misc(int chip, bool pal)
         gd_FreeSprite(&E, 0);
         gd_extsprite *es2 = gd_AllocSpriteDataA(&E, &bm, t + 3);
         gfx_tagitem g[] = { T(GD_GSTAG_ATTACHED, (uint32_t)(uintptr_t)es2), T(0, 0) };
-        CHECK(gd_GetExtSpriteA(&E, es, g) == 0 && es2->es.num == 1 && (es2->flags & GD_SPRITE_ATTACHED), "GetExtSpriteA attached pair");
+        if (chip == 2)
+            CHECK(gd_GetExtSpriteA(&E, es, g) == 0 && es2->es.num == 1 && (es2->flags & GD_SPRITE_ATTACHED), "GetExtSpriteA attached pair");
+        else
+            CHECK(gd_GetExtSpriteA(&E, es, g) == -1 && es2->es.num == -1, "GetExtSpriteA of a 32-pixel pair needs AGA");
         gfx_tagitem g2[] = { T(GD_GSTAG_SPRITE_NUM, 3), T(GD_GSTAG_ATTACHED, (uint32_t)(uintptr_t)es2), T(0, 0) };
         CHECK(gd_GetExtSpriteA(&E, es2, g2) == -1, "an attached pair starts even");
         gd_extsprite *es3 = gd_AllocSpriteDataA(&E, &bm, t + 1);
@@ -1053,6 +1105,84 @@ static void fetch_modes(int chip)
     printf("fetch chip %d done\n", chip);
 }
 
+/* sprites 16, 32 and 64 pixels wide, as the chips fetch and show them:
+ * GetExtSpriteA and ChangeExtSpriteA set FMODE's sprite width, the control
+ * words go where that width puts them, and every pixel shows where it
+ * should; a hires ViewPort's sprite moves by hires pixels on AGA */
+static void wide_sprites(int chip)
+{
+    tused = 0;
+    boot(chip, true);
+    spr_on = true;
+    static uint8_t sp[2][8 * 6];
+    gfx_bitmap bm;
+    memset(&bm, 0, sizeof bm);
+    uint32_t r = 12345;
+    for (int k = 0; k < 2; k++)
+        for (int i = 0; i < 8 * 6; i++) { r = r * 1103515245u + 12345u; sp[k][i] = (uint8_t)(r >> 16); }
+    bm.bytesperrow = 8; bm.rows = 6; bm.depth = 2; bm.planes[0] = sp[0]; bm.planes[1] = sp[1];
+    gd_viewport hv;
+    gd_InitVPort(&E, &hv);
+    hv.modes = GD_HIRES;
+    gd_extsprite *prev = 0;
+    for (int pass = 0; pass < 4; pass++) {
+        int W = pass == 3 ? 4 : 1 << pass;      /* 16, 32, 64; then 64 through ChangeExtSpriteA, on a hires ViewPort */
+        gfx_tagitem t[] = { T(GD_SPRITEA_Width, (uint32_t)(16 * W)), T(0, 0) }, g[] = { T(GD_GSTAG_SPRITE_NUM, 2), T(0, 0) };
+        gd_extsprite *es = gd_AllocSpriteDataA(&E, &bm, t);
+        CHECK(es && es->wordwidth == W, "AllocSpriteDataA's width");
+        if (!es) break;
+        int32_t n = pass < 3 ? gd_GetExtSpriteA(&E, es, g) : gd_ChangeExtSpriteA(&E, &hv, prev, es, 0) ? 2 : -1;
+        if (chip < 2 && W > 1) {
+            CHECK(n == -1, "a wide sprite needs AGA");
+            gd_FreeSpriteData(&E, es);
+            continue;
+        }
+        CHECK(n == 2, "the wide sprite is sprite 2");
+        if (pass < 3) gd_MoveSprite(&E, 0, &es->es, 40, 30);
+        else gd_MoveSprite(&E, &hv, &es->es, 81, 60);
+        CHECK(es->es.posctldata[W] >> 8 == ((pass < 3 ? 0x2C + 36 : 0x2C + 66) & 0xFF), "SPRxCTL in the sprite's second fetch");
+        uint16_t fm = M.chip == 2 ? (uint16_t)(W == 4 ? 0x000C : W == 2 ? 0x0004 : 0) : 0;
+        CHECK(GB->spritewidth == 16 * W && GB->spritefmode == fm, "GfxBase's sprite width and FMODE");
+        frame(true);
+        CHECK(chip < 2 || M.reg[GD_FMODE >> 1] == fm, "FMODE's sprite width");
+        /* at the View's left edge plus x: lores 0x81 + 40, hires 0x81 + 40.5 */
+        int x0 = pass < 3 ? 4 * (0x81 + 40) : 4 * 0x81 + 2 * 81, y0 = pass < 3 ? 0x2C + 30 : 0x2C + 60;
+        bool same = true;
+        for (int l = y0 - 1; l <= y0 + 6; l++)
+            for (int i = -4; i < 64 * 4 + 8; i++) {
+                int px = i >> 2, want = 0;
+                if (l >= y0 && l < y0 + 6 && i >= 0 && px < 16 * W) {
+                    int c = (sp[0][(l - y0) * 8 + (px >> 3)] >> (7 - (px & 7)) & 1) | (sp[1][(l - y0) * 8 + (px >> 3)] >> (7 - (px & 7)) & 1) << 1;
+                    want = c ? 8 + c : 0;
+                }
+                if (sprfb[l][x0 + i] != want) same = false;
+            }
+        CHECK(same, "the sprite's pixels, at its width and place");
+        if (!same) printf("  chip %d width %d: the sprite differs\n", chip, 16 * W);
+        if (pass == 2) prev = es;
+        else {
+            if (pass == 3) gd_FreeSpriteData(&E, prev);
+            gd_FreeSprite(&E, 2);
+            gd_FreeSpriteData(&E, es);
+        }
+    }
+    /* an attached pair at 64 pixels: SPRxCTL's ATT in the odd one's second fetch */
+    if (chip == 2) {
+        gfx_tagitem t[] = { T(GD_SPRITEA_Width, 64), T(0, 0) };
+        gd_extsprite *a = gd_AllocSpriteDataA(&E, &bm, t), *b = gd_AllocSpriteDataA(&E, &bm, t);
+        gfx_tagitem g[] = { T(GD_GSTAG_ATTACHED, (uint32_t)(uintptr_t)b), T(0, 0) };
+        CHECK(gd_GetExtSpriteA(&E, a, g) == 0 && (b->es.posctldata[4] & 0x80) && !(b->es.posctldata[1] & 0x80),
+              "an attached pair at 64 pixels");
+        gd_FreeSprite(&E, 0);
+        gd_FreeSprite(&E, 1);
+        gd_FreeSpriteData(&E, a);
+        gd_FreeSpriteData(&E, b);
+    }
+    spr_on = false;
+    shutdown();
+    printf("sprites chip %d done\n", chip);
+}
+
 /* Multiscan, DblNTSC and DblPAL as OS 3.2.3's drivers make them
  * (tests/MonitorProbe.c on an OS 3.2.3 A1200, 3 November 2026): the
  * drivers' MonitorSpecs and SpecialMonitors as display_os323_screens.txt
@@ -1261,6 +1391,7 @@ int main(void)
     for (int c = 0; c < 3; c++)
         for (int p = 0; p < 2; p++) misc(c, p != 0);
     for (int c = 0; c < 3; c++) fetch_modes(c);
+    for (int c = 0; c < 3; c++) wide_sprites(c);
     monitors31();
     side_by_side();
     printf("%lu checks, %lu failed\n", checks, fails);

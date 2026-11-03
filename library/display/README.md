@@ -92,6 +92,8 @@ These are as OS 3.2.3's drivers make them, measured with `tests/MonitorProbe.c` 
 | FreeVPortCopLists | Frees DspIns, SprIns, ClrIns and the UCopList, including the UCopList structure itself | documented; ABI test (UCOP freed) |
 | SpritePriorities 0 | BPLCON2 0x24, as OS 3.2 does | ABI test |
 | MoveSprite | x in the ViewPort's pixels and y in its lines; HSTART is the View's left edge plus x − 1 | ABI test (SPRITE moved) |
+| MoveSprite on AGA in a hires or super hires ViewPort | HSTART in 35 ns pixels: SPRxCTL's SH1 (bit 4) and SH0 (bit 3) as well, so the sprite moves by the ViewPort's own pixels | AGA's SPRxCTL; test |
+| Sprite width (SPRITEA_Width 32 or 64) | One width for all eight sprites, as the chips fetch them (FMODE's SPR32 and SPAGEM, GfxBase's SpriteWidth and SpriteFMode). GetExtSpriteA and ChangeExtSpriteA set it to the sprite's; SPRxCTL is the first word of the sprite's second fetch (word 2 or 4). On OCS and ECS a wider sprite is refused: GetExtSpriteA answers -1, ChangeExtSpriteA 0. (Until 3 November 2026 GetExtSpriteA left the width as it was, so a wide sprite showed at 16) | HRM (AGA's sprite fetch); test |
 | GetSprite of a sprite that is taken, or -1 with none free | -1 | documented |
 | AllocSpriteDataA defaults | num -1, height from the bitmap, word width 1, posctldata 8-aligned in Chip RAM | ABI test (SPRDATA) |
 | GetExtSpriteA with old-format data and no OutputHeight | NULL: old data does not say how tall it is | ABI test |
@@ -131,6 +133,7 @@ For each ViewPort, it checks the picture after MakeVPort, MrgCop and LoadView, a
 The harness also checks:
 
 - The database, monitors, VideoControl, sprites, the beam and WaitTOF.
+- Sprites 16, 32 and 64 pixels wide through a model of the sprite DMA (control words, data words at FMODE's width, HSTART to 35 ns): every pixel where it should be, through GetExtSpriteA and ChangeExtSpriteA, and on a hires ViewPort at an odd x; an attached pair at 64; OCS and ECS refusing them.
 - Multiscan, DblNTSC and DblPAL (`monitors31`). The drivers' MonitorSpecs and SpecialMonitors are added to MonitorList as a driver does. Every one of their 56 modes' records is printed as MonitorProbe prints it, and the script compares them line by line with OS 3.2.3's (`display_os323_modes.txt`). The check also covers MakeVPort's registers for OS 3.2.3's six screens, MrgCop's waits through lines 255 and 511, LoadView calling `do_monitor` once, and the modes going when the driver goes.
 - The fetch per chipset: DimensionInfo's MaxDepth for each kind of mode; MakeVPort's answer for lores, hires and super hires at depths 1 to 8, plain and laced; and the DDFSTRT, DDFSTOP, modulos, BPLCON1 and FMODE it sets. Also SysInfo 4.4's screen (640 super hires pixels, 3 planes: 4×, 0x38-0x88), a scrolled 8-plane hires screen at 4×, lores on 32 bits at 2×, a lores screen at the left edge scrolled back to 1×, bitmaps off a wider fetch's width, and FMODE taking a 32-pixel sprite's width in a shown View.
 - Running out of memory, and all memory given back.
@@ -142,7 +145,7 @@ After that, the script:
 - Compiles `display_lvo.c` as C.
 - Runs nm checks: the core calls nothing but libgcc, and there is no .data, .bss or C++ runtime.
 
-Result (m68k-linux-gnu-g++ 13.3.0, qemu-m68k 8.2.2, seed 20261013, 120 scenes, 3 November 2026): every build shows the same 855 ViewPort pictures as the model, with 3847 checks and 0 failed, and the 56 records are OS 3.2.3's. Seed 7 (300 scenes) also passes.
+Result (m68k-linux-gnu-g++ 13.3.0, qemu-m68k 8.2.2, seed 20261013, 120 scenes, 3 November 2026): every build shows the same 855 ViewPort pictures as the model, with 3923 checks and 0 failed, and the 56 records are OS 3.2.3's. Seed 7 (300 scenes) also passes.
 
 `tests/ScreenDepthProbe.c` runs on an Amiga with any ROM. It prints the MaxDepth of lores, hires and super hires, whether SysInfo 4.4's screen and its neighbours open, and a table of every resolution and depth from 1 to 8, plain and laced. With MODES and DEPTH it holds one screen on show, with a bar for each colour, for a screenshot. `library/display/build-amiga.sh` builds it.
 
@@ -150,7 +153,7 @@ Result (m68k-linux-gnu-g++ 13.3.0, qemu-m68k 8.2.2, seed 20261013, 120 scenes, 3
 
 ## Not yet
 
-- Wide sprites: SPRITEA_Width 32 and 64 are allocated, but shown at 16.
+- A 16-pixel sprite's data shown while the width is 32 or 64 (another program's wide sprite) is read at that width: graphics.library does not convert it.
 - Euro72, Euro36, Super72 and A2024: their drivers' modes are not in the database (as with any other driver, until the AddDisplayInfo calls are done).
 - The test's machine shows 15 kHz frames only. The 31 kHz modes are checked against OS 3.2.3's registers, not pixel by pixel.
 - `do_monitor` is called as a C function with the MonitorSpec on the stack (`SpecialMonitor`'s declared type). OS 3.2.3's own call has not been seen.

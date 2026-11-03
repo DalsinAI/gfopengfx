@@ -13,39 +13,54 @@ using namespace gd;
 
 namespace {
 
-int floordiv(int a, int b) { return a >= 0 ? a / b : -((-a + b - 1) / b); }
-
 /* a sprite's control words for (x, y) in vp (or the View when vp is 0):
  * x in the ViewPort's pixels, y in its lines (ABI test: OS 3.2's units
- * and the HSTART of the View's left edge) */
+ * and the HSTART of the View's left edge). HSTART is kept in 35ns pixels:
+ * SH10-SH3 in SPRxPOS, SH2 in SPRxCTL bit 0 as on every chipset, and on
+ * AGA SH1 (bit 4) and SH0 (bit 3), so a hires or superhires ViewPort's
+ * sprite moves by its own pixels (AGA's SPRxCTL). The control words are
+ * the first word of each of the sprite's fetches: SPRxCTL at word w. */
 void place(gfx_env *env, gd_viewport *vp, gd_simplesprite *s, int x, int y)
 {
     gfx_base *gb = base(env);
     uint16_t *d = s->posctldata;
     if (!d) return;
     gd_view *view = static_cast<gd_view *>(gb->actiview);
-    int hx = view ? view->dxoffset : VIEW_X, vy = view ? view->dyoffset : VIEW_Y;
+    int h = 4 * ((view ? view->dxoffset : VIEW_X) - 1), vy = view ? view->dyoffset : VIEW_Y;
     if (vp) {
-        int res = (vp->modes & GD_SUPERHIRES) ? 4 : (vp->modes & GD_HIRES) ? 2 : 1;
+        int q = (vp->modes & GD_SUPERHIRES) ? 1 : (vp->modes & GD_HIRES) ? 2 : 4;   /* 35ns pixels a pixel */
         bool lace = (vp->modes & GD_LACE) != 0;
-        hx += floordiv(vp->dxoffset, res) + floordiv(x, res);
+        h += q * (vp->dxoffset + x);
         vy += lace ? (vp->dyoffset >> 1) + (y >> 1) : vp->dyoffset + y;
     } else {
-        hx += x;
+        h += 4 * x;
         vy += y;
     }
-    int hstart = hx - 1;                /* the sprite's HSTART for the bitplanes' first pixel */
     int vstart = vy, vstop = vy + s->height;
-    if (hstart < 0) hstart = 0;
+    if (h < 0) h = 0;
     if (vstart < 0) vstart = 0;
     if (vstop < vstart) vstop = vstart;
     int w = st(env)->spritewords;
-    uint16_t pos = static_cast<uint16_t>((vstart & 0xFF) << 8 | ((hstart >> 1) & 0xFF));
+    uint16_t pos = static_cast<uint16_t>((vstart & 0xFF) << 8 | ((h >> 3) & 0xFF));
     uint16_t ctl = static_cast<uint16_t>((vstop & 0xFF) << 8 | (d[w] & 0x80) | ((vstart >> 8) & 1) << 2
-                                         | ((vstop >> 8) & 1) << 1 | (hstart & 1));
-    if (aga(env)) ctl |= static_cast<uint16_t>(((vstart >> 9) & 1) << 6 | ((vstop >> 9) & 1) << 5);
+                                         | ((vstop >> 8) & 1) << 1 | ((h >> 2) & 1));
+    if (aga(env))
+        ctl |= static_cast<uint16_t>(((vstart >> 9) & 1) << 6 | ((vstop >> 9) & 1) << 5 | ((h >> 1) & 1) << 4
+                                     | (h & 1) << 3);
     d[0] = pos;
     d[w] = ctl;
+}
+
+/* the sprites' width, 1, 2 or 4 words (FMODE's SPR32 and SPAGEM): one for
+ * all eight, as the chips fetch them; wider than 1 needs AGA */
+bool sprite_width(gfx_env *env, int w)
+{
+    state *s = st(env);
+    if (w == s->spritewords) return true;
+    if (w != 1 && !aga(env)) return false;
+    s->spritewords = static_cast<uint16_t>(w);
+    set_fmode(env);
+    return true;
 }
 
 int16_t claim(gfx_env *env, int num, int count, gd_simplesprite *a, gd_simplesprite *b)
@@ -289,8 +304,11 @@ int32_t gd_GetExtSpriteA(gfx_env *env, gd_extsprite *es, const gfx_tagitem *tags
     int num = static_cast<int32_t>(tag_data(tags, GD_GSTAG_SPRITE_NUM, static_cast<uint32_t>(-1)));
     gd_extsprite *pair = reinterpret_cast<gd_extsprite *>(static_cast<uintptr_t>(tag_data(tags, GD_GSTAG_ATTACHED, 0)));
     if (tag_data(tags, GD_GSTAG_SOFTSPRITE, 0)) return -1;     /* no soft sprites: not yet */
+    int w = es->wordwidth ? es->wordwidth : 1;
+    if (w != 1 && !aga(env)) return -1;
     int16_t n = claim(env, num, pair ? 2 : 1, &es->es, pair ? &pair->es : nullptr);
     if (n < 0) return -1;
+    sprite_width(env, w);               /* the chips fetch it at its width (until 3 November 2026: at 16) */
     set_sprite_ptr(env, n, es->es.posctldata);
     if (pair) {
         pair->flags |= GD_SPRITE_ATTACHED;
@@ -309,11 +327,7 @@ int32_t gd_ChangeExtSpriteA(gfx_env *env, gd_viewport *vp, gd_extsprite *oldsp, 
     int num = oldsp ? oldsp->es.num : newsp->es.num;
     if (num < 0 || num > 7) return 0;
     int w = newsp->wordwidth ? newsp->wordwidth : 1;
-    if (w != s->spritewords) {
-        if (w != 1 && !aga(env)) return 0;
-        s->spritewords = static_cast<uint16_t>(w);
-        set_fmode(env);
-    }
+    if (!sprite_width(env, w)) return 0;
     newsp->es.num = static_cast<int16_t>(num);
     s->sprites[num] = &newsp->es;
     if (newsp->flags & GD_SPRITE_ATTACHED) newsp->es.posctldata[w] |= 0x80;
