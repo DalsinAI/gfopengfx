@@ -12,8 +12,12 @@
  * ViewPosition, ViewPositionRange, ViewResolution, MouseTicks,
  * DefaultViewPosition, PreferredModeID and Compatibility, and its name.
  *
- *   MonitorProbe ID=000A1000 [DEPTH=2]
- * opens a screen of that mode behind, and prints its View's DxOffset and
+ *   MonitorProbe MON=000A1000
+ * prints the modes of that monitor with the default monitor's keys,
+ * found by ID (OS 3.2.3's NextDisplayInfo did not give a driver's modes).
+ *
+ *   MonitorProbe ID=000A1000 [DEPTH=2] [FRONT]
+ * opens a screen of that mode behind (in front with FRONT), and prints its View's DxOffset and
  * DyOffset, its ViewPort's place and size, BEAMCON0 as GfxBase keeps it
  * (system_bplcon0, the MonitorSpec's BeamCon0), and every MOVE of the
  * View's long frame copper list as "reg=value", then closes it.
@@ -68,16 +72,15 @@ static void monitors(void)
     Permit();
 }
 
-static void modes(void)
+static void mode(ULONG id)
 {
-    ULONG id = (ULONG)INVALID_ID;
-    while ((id = NextDisplayInfo(id)) != (ULONG)INVALID_ID) {
+    {
         struct DisplayInfo di;
         struct DimensionInfo dm;
         struct MonitorInfo mi;
         struct NameInfo ni;
         DisplayInfoHandle h = FindDisplayInfo(id);
-        if (!h) continue;
+        if (!h) return;
         Printf("MODE %08lx na %lx", id, ModeNotAvailable(id));
         if (GetDisplayInfoData(h, (UBYTE *)&di, sizeof di, DTAG_DISP, 0))
             Printf(" props %08lx res %ld,%ld speed %ld sprres %ld,%ld", di.PropertyFlags, (LONG)di.Resolution.x,
@@ -104,10 +107,21 @@ static void modes(void)
     }
 }
 
-static void screen(ULONG id, LONG depth)
+/* every mode NextDisplayInfo gives; with MON, every key of the default
+ * monitor's modes on that monitor too (FindDisplayInfo by ID) */
+static void modes(ULONG mon)
+{
+    ULONG id = (ULONG)INVALID_ID;
+    while ((id = NextDisplayInfo(id)) != (ULONG)INVALID_ID) {
+        if (mon && (id & MONITOR_ID_MASK) == 0 && id < 0x10000) mode(mon | id);
+        else if (!mon) mode(id);
+    }
+}
+
+static void screen(ULONG id, LONG depth, BOOL front)
 {
     ULONG err = 0;
-    struct TagItem t[] = { { SA_DisplayID, id }, { SA_Depth, (ULONG)depth }, { SA_Behind, TRUE }, { SA_Quiet, TRUE },
+    struct TagItem t[] = { { SA_DisplayID, id }, { SA_Depth, (ULONG)depth }, { SA_Behind, (ULONG)!front }, { SA_Quiet, TRUE },
                            { SA_ErrorCode, (ULONG)&err }, { TAG_DONE, 0 } };
     struct Screen *s = OpenScreenTagList(NULL, t);
     struct View *v;
@@ -144,18 +158,20 @@ static void screen(ULONG id, LONG depth)
 
 int main(void)
 {
-    LONG args[2] = { 0, 0 };
-    struct RDArgs *rd = ReadArgs("ID/K,DEPTH/K/N", args, NULL);
+    LONG args[4] = { 0, 0, 0, 0 };
+    struct RDArgs *rd = ReadArgs("ID/K,DEPTH/K/N,MON/K,FRONT/S", args, NULL);
     if (!rd) {
         PrintFault(IoErr(), "MonitorProbe");
         return 10;
     }
     Printf("graphics %ld.%ld\n", (LONG)GfxBase->LibNode.lib_Version, (LONG)GfxBase->LibNode.lib_Revision);
     if (args[0])
-        screen(strtoul((char *)args[0], 0, 16), args[1] ? *(LONG *)args[1] : 2);
+        screen(strtoul((char *)args[0], 0, 16), args[1] ? *(LONG *)args[1] : 2, args[3] != 0);
+    else if (args[2])
+        modes(strtoul((char *)args[2], 0, 16));
     else {
         monitors();
-        modes();
+        modes(0);
     }
     FreeArgs(rd);
     return 0;
