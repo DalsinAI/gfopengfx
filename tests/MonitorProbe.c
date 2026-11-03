@@ -70,8 +70,8 @@ static void monitors(void)
 
 static void modes(void)
 {
-    ULONG id = INVALID_ID;
-    while ((id = NextDisplayInfo(id)) != INVALID_ID) {
+    ULONG id = (ULONG)INVALID_ID;
+    while ((id = NextDisplayInfo(id)) != (ULONG)INVALID_ID) {
         struct DisplayInfo di;
         struct DimensionInfo dm;
         struct MonitorInfo mi;
