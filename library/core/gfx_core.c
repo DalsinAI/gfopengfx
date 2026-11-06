@@ -4,6 +4,12 @@
 
 typedef uint32_t __attribute__((may_alias)) u32a;
 #define PLANE_OK(p) ((p) && (p) != (uint8_t *)-1)
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+#define PUT32(d, v) (*(u32a *)(d) = (v))
+#else
+#define PUT32(d, v) ((d)[0] = (uint8_t)((v) >> 24), (d)[1] = (uint8_t)((v) >> 16), \
+                     (d)[2] = (uint8_t)((v) >> 8), (d)[3] = (uint8_t)(v))
+#endif
 
 static uint32_t plane_bit(const uint8_t *pl, uint32_t off, uint8_t bit)
 {
@@ -123,6 +129,11 @@ static void c2p8(const uint8_t *s, uint8_t out[8])
     out[3] = (uint8_t)(y >> 24); out[2] = (uint8_t)(y >> 16); out[1] = (uint8_t)(y >> 8); out[0] = (uint8_t)y;
 }
 
+/* WritePixelArray8's and WriteChunkyPixels' planar path. A build for size
+ * (-Os: the ROM's graphics.library, which must not grow) keeps the small
+ * one, eight pixels at a time and every byte tested; any other build (the
+ * disk gfopengpu.library, -O2), or GFX_CORE_FAST, the fast one. */
+#if defined(__OPTIMIZE_SIZE__) && !defined(GFX_CORE_FAST)
 void gfx_planar_write8(const struct gfx_planar *bm, int32_t x0, int32_t y0, int32_t x1, int32_t y1,
                        const uint8_t *src, uint32_t src_bpr, uint32_t mask)
 {
@@ -151,6 +162,136 @@ void gfx_planar_write8(const struct gfx_planar *bm, int32_t x0, int32_t y0, int3
         }
     }
 }
+
+#else
+/* One byte of every live plane from eight pens, keep's bits left as they
+ * were (an edge byte of the rectangle). */
+static void put8(const struct gfx_planar *bm, uint32_t live, uint32_t off, const uint8_t s[8], uint8_t keep)
+{
+    uint8_t pb[8];
+    uint32_t p;
+
+    c2p8(s, pb);
+    for (p = 0; p < bm->depth; p++) {
+        uint8_t *d;
+        if (!(live >> p & 1)) continue;
+        d = bm->planes[p] + off;
+        *d = keep ? (uint8_t)((*d & keep) | (pb[p] & ~keep)) : pb[p];
+    }
+}
+
+/* Whether every live plane's address has the same low two bits, so one
+ * byte offset puts all of them on a long at once. */
+static int planes_in_step(const struct gfx_planar *bm, uint32_t live)
+{
+    uint32_t p, a = 4;
+
+    for (p = 0; p < bm->depth; p++) {
+        uint32_t b;
+        if (!(live >> p & 1)) continue;
+        b = (uint32_t)(uintptr_t)bm->planes[p] & 3;
+        if (a == 4) a = b;
+        else if (a != b) return 0;
+    }
+    return 1;
+}
+
+/* The whole bytes of a row: 32 pixels at a time a long to each plane where
+ * the planes are in step (a quarter of the writes, which is what Chip RAM
+ * charges for), and eight at a time a byte to each plane otherwise. */
+static void row8(const struct gfx_planar *bm, uint32_t live, uint32_t off, uint32_t n, const uint8_t *s, int longs)
+{
+    uint32_t k;
+
+    if (longs) {
+        uint32_t first = 0;
+        while (!(live >> first & 1)) first++;
+        while (n && ((uint32_t)(uintptr_t)(bm->planes[first] + off) & 3)) {
+            put8(bm, live, off, s, 0);
+            off++; n--; s += 8;
+        }
+        for (; n >= 4; n -= 4, off += 4) {
+            uint32_t l0 = 0, l1 = 0, l2 = 0, l3 = 0, l4 = 0, l5 = 0, l6 = 0, l7 = 0;
+            for (k = 0; k < 4; k++, s += 8) {
+                uint32_t x = (uint32_t)s[0] << 24 | (uint32_t)s[1] << 16 | (uint32_t)s[2] << 8 | s[3];
+                uint32_t y = (uint32_t)s[4] << 24 | (uint32_t)s[5] << 16 | (uint32_t)s[6] << 8 | s[7];
+                uint32_t t;
+                t = (x ^ (x >> 7)) & 0x00AA00AAu;  x ^= t ^ (t << 7);
+                t = (y ^ (y >> 7)) & 0x00AA00AAu;  y ^= t ^ (t << 7);
+                t = (x ^ (x >> 14)) & 0x0000CCCCu; x ^= t ^ (t << 14);
+                t = (y ^ (y >> 14)) & 0x0000CCCCu; y ^= t ^ (t << 14);
+                t = (x & 0xF0F0F0F0u) | ((y >> 4) & 0x0F0F0F0Fu);
+                y = ((x << 4) & 0xF0F0F0F0u) | (y & 0x0F0F0F0Fu);
+                l7 = l7 << 8 | t >> 24; l6 = l6 << 8 | (t >> 16 & 0xFF);
+                l5 = l5 << 8 | (t >> 8 & 0xFF); l4 = l4 << 8 | (t & 0xFF);
+                l3 = l3 << 8 | y >> 24; l2 = l2 << 8 | (y >> 16 & 0xFF);
+                l1 = l1 << 8 | (y >> 8 & 0xFF); l0 = l0 << 8 | (y & 0xFF);
+            }
+            if (live == 0xFF) {                /* eight planes, all drawn: no tests */
+                PUT32(bm->planes[0] + off, l0); PUT32(bm->planes[1] + off, l1);
+                PUT32(bm->planes[2] + off, l2); PUT32(bm->planes[3] + off, l3);
+                PUT32(bm->planes[4] + off, l4); PUT32(bm->planes[5] + off, l5);
+                PUT32(bm->planes[6] + off, l6); PUT32(bm->planes[7] + off, l7);
+            } else {
+                if (live & 0x01) PUT32(bm->planes[0] + off, l0);
+                if (live & 0x02) PUT32(bm->planes[1] + off, l1);
+                if (live & 0x04) PUT32(bm->planes[2] + off, l2);
+                if (live & 0x08) PUT32(bm->planes[3] + off, l3);
+                if (live & 0x10) PUT32(bm->planes[4] + off, l4);
+                if (live & 0x20) PUT32(bm->planes[5] + off, l5);
+                if (live & 0x40) PUT32(bm->planes[6] + off, l6);
+                if (live & 0x80) PUT32(bm->planes[7] + off, l7);
+            }
+        }
+    }
+    for (; n; n--, off++, s += 8)
+        put8(bm, live, off, s, 0);
+}
+
+void gfx_planar_write8(const struct gfx_planar *bm, int32_t x0, int32_t y0, int32_t x1, int32_t y1,
+                       const uint8_t *src, uint32_t src_bpr, uint32_t mask)
+{
+    uint32_t bx0 = (uint32_t)x0 >> 3, bx1 = (uint32_t)x1 >> 3, p, live = 0;
+    uint32_t lead = (uint32_t)x0 & 7, tail = (uint32_t)x1 & 7;
+    int32_t y;
+    int longs;
+
+    for (p = 0; p < bm->depth; p++)
+        if (mask >> p & 1 && PLANE_OK(bm->planes[p])) live |= 1u << p;
+    if (!live) return;
+    longs = planes_in_step(bm, live);
+    for (y = y0; y <= y1; y++, src += src_bpr) {
+        uint32_t row = (uint32_t)y * bm->bytes_per_row, bx = bx0, i;
+        const uint8_t *s = src;
+        uint8_t e[8];
+
+        if (bx0 == bx1 || lead) {            /* the first byte, cut on the left */
+            uint8_t keep = 0;
+            for (i = 0; i < 8; i++) {
+                if (i < lead || (bx0 == bx1 && i > tail)) { e[i] = 0; keep |= (uint8_t)(0x80 >> i); }
+                else e[i] = s[i - lead];
+            }
+            put8(bm, live, row + bx0, e, keep);
+            if (bx0 == bx1) continue;
+            s += 8 - lead;
+            bx++;
+        }
+        /* the whole bytes, then the last, cut on the right unless it is whole */
+        if (tail == 7) {
+            row8(bm, live, row + bx, bx1 - bx + 1, s, longs);
+        } else {
+            uint8_t keep = 0;
+            row8(bm, live, row + bx, bx1 - bx, s, longs);
+            s += (bx1 - bx) * 8;
+            for (i = 0; i < 8; i++) {
+                if (i > tail) { e[i] = 0; keep |= (uint8_t)(0x80 >> i); }
+                else e[i] = s[i];
+            }
+            put8(bm, live, row + bx1, e, keep);
+        }
+    }
+}
+#endif
 
 void gfx_planar_read8(const struct gfx_planar *bm, int32_t x0, int32_t y0, int32_t x1, int32_t y1,
                       uint8_t *dst, uint32_t dst_bpr)

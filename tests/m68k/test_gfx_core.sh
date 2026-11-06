@@ -1,6 +1,6 @@
 #!/bin/sh
 # GFOpenGfx's core (library/core/gfx_core.c) built with an m68k cross GCC for
-# the 68040 at -O0 and -O2, each run on that CPU under
+# the 68040 at -O0, -O2 and -Os (-Os builds write8's small path), each run on that CPU under
 # qemu-m68k, against a plain model: an array of pens drawn one pixel at a
 # time. Random bitmaps
 # (depth 1 to 8, some planes 0 or -1, odd sizes), pens, masks and
@@ -72,7 +72,9 @@ static void setup(void)
     width = bm.bytes_per_row * 8;
     for (p = 0; p < 8; p++) {
         uint32_t r = rnd() % 10;
-        bm.planes[p] = r == 0 ? 0 : r == 1 ? (uint8_t *)-1 : mem[p];
+        /* a plane a byte or three off a long now and then: planes out of
+         * step take write8's byte path, in step its long path */
+        bm.planes[p] = r == 0 ? 0 : r == 1 ? (uint8_t *)-1 : mem[p] + (rnd() % 4 ? 0 : rnd() % 4);
         for (x = 0; x < sizeof mem[p]; x++) mem[p][x] = (uint8_t)rnd();
     }
     for (y = 0; y < H; y++)
@@ -266,7 +268,7 @@ C
 
 
 for cpu in -m68040; do
-  for opt in -O0 -O2; do
+  for opt in -O0 -O2 -Os; do
     "$cc" $cpu $opt -static -Wall -Wextra -Werror -I"$core" -o "$tmp/t" "$tmp/t.c" "$core/gfx_core.c"
     q=m${cpu#-m}
     if out=$("$qemu" -cpu $q "$tmp/t"); then echo "ok   $opt $cpu: $out"; else echo "FAIL $opt $cpu:"; echo "$out"; fail=1; fi
