@@ -2,15 +2,15 @@
 /* DriverCallLog: what a program asks of graphics.library's display calls.
  * Copyright (c) 2026 AmiCradle Team. MIT.
  *
- *   DriverCallLog [DUMP=addr] [LEN=n] [CALLS=first-last,...] [CMD=...]
+ *   DriverCallLog [DUMP=addr,...] [LEN=n] [CALLS=first-last,...] [CMD=...]
  * patches OpenMonitor, CloseMonitor, FindDisplayInfo, NextDisplayInfo,
  * GetDisplayInfoData, GfxNew, GfxFree, GfxAssociate, GfxLookUp and the
  * private -738, -744 and -750 with SetFunction, runs CMD (a monitor driver,
  * say), takes the patches off and prints every call: its registers, the
  * memory a0, a1 and a2 point at before and a0's and a1's after, and the
  * result with the memory it points at. Then the display database's head and
- * each MonitorSpec's list, and DUMP's memory, each with what its longwords
- * point at. It only observes. Run it on the ROM to be measured. */
+ * each MonitorSpec's list, or with DUMP that memory instead, each with what
+ * its longwords point at. It only observes. Run it on the ROM to be measured. */
 #include <exec/types.h>
 #include <exec/memory.h>
 #include <exec/execbase.h>
@@ -225,8 +225,16 @@ int main(void)
         report((const char *)args[2]);
         FreeMem(recs, NRECS * sizeof(struct rec));
     }
-    database();
-    if (args[0]) dump("asked", strtoul((char *)args[0], 0, 16), args[1] ? *(LONG *)args[1] : 256);
+    if (args[0]) {
+        const char *c = (const char *)args[0];
+        while (*c) {
+            char *e;
+            dump("asked", strtoul(c, &e, 16), args[1] ? *(LONG *)args[1] : 256);
+            if (*e != ',') break;
+            c = e + 1;
+        }
+    } else
+        database();
     FreeArgs(rd);
     return 0;
 }
