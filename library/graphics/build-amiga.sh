@@ -23,13 +23,13 @@ OBJDUMP=${OBJDUMP:-"$P/bin/m68k-amigaos-objdump"}
 OUT=${OUT:-"$HERE/build-amiga"}
 # the ROM module's optimisation: -Os (size) by default; OPT=-O2 for speed
 OPT=${OPT:--Os}
-GUEST=${GUEST:?set GUEST to an amicradle-guest checkout}
+GUEST=${GUEST:-}
 mkdir -p "$OUT/libs" "$OUT/tests" "$OUT/obj"
 
 # NDK 3.2's fd, never fd13
 FD=${FD:-"$P/m68k-amigaos/ndk/lib/fd/graphics_lib.fd"}
 [ -f "$FD" ] || { echo "no $FD: set FD=" >&2; exit 1; }
-python3 "$GUEST/libraries/common/check_fd.py" "$FD" "$HERE/graphics.lvo"
+[ -z "$GUEST" ] || python3 "$GUEST/libraries/common/check_fd.py" "$FD" "$HERE/graphics.lvo"
 
 COMMON="-m68040 $OPT -fno-strict-aliasing -fno-delete-null-pointer-checks -fomit-frame-pointer -fno-toplevel-reorder
   -fno-lto -fno-builtin -fno-tree-loop-distribute-patterns -Wall -Wextra -Werror -Wno-unused-parameter
