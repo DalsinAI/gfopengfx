@@ -41,7 +41,7 @@
 #ifndef LIBNAME
 #define LIBNAME "graphics.library"
 #endif
-#define LIB_VERSION  47
+#define LIB_VERSION  48
 #define LIB_REVISION 103                /* 47.100 and up: GFOpenGfx; 47.101: the drawing dispatch (gfx_dispatch.c); 47.102: its provider chain; 47.103: monitor drivers (the database's tree, -744, -750, xln_Init) */
 
 /* Run as a program, the library does nothing. This must stay the first code
