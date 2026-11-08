@@ -1474,7 +1474,6 @@ static void driver_records()
     CHECK(gd_monitor_init(&E, ms, 1) == 1 && ms->total_rows == 262 && ms->min_row == 21 && !ms->special, "xln_Init on NTSC, no SpecialMonitor");
     gd_GfxFree(&E, &ms->n);
     shutdown();
-    printf("driver records done\n");
 }
 
 /* gfopengfx.library next to OS 3.2's graphics.library: the same calls, no
