@@ -231,6 +231,17 @@ struct gd_queryheader {                 /* struct QueryHeader, 16 bytes */
     uint32_t structid, displayid, skipid, length;
 };
 
+/* A record of the database's tree, GfxBase->DisplayInfoDataBase (no NDK
+ * header; OS 3.2.3's, measured with tests/DriverCallLog.c). A monitor driver
+ * allocates its monitor's and its modes' and links them in itself. */
+struct gd_dbnode {                      /* 56 bytes */
+    struct gd_dbnode *succ, *pred, *child, *parent;
+    uint32_t id;                        /* the root's 0, a monitor's its ID >> 16, a mode's its display ID */
+    uint32_t more;                      /* GFX_TAG_MORE when data is set */
+    void *data;                         /* the first data record */
+    uint32_t reserved[7];               /* the driver's */
+};
+
 struct gd_displayinfo {                 /* struct DisplayInfo, 56 bytes */
     struct gd_queryheader header;
     uint16_t notavailable;
@@ -416,6 +427,7 @@ GD_OFF(gd_monitorspec, displaycompatible, 84);
 GD_OFF(gd_monitorspec, displayinfodatabase, 88);
 GD_OFF(gd_monitorspec, mrgcop, 148);
 GD_SIZE(gd_queryheader, 16);
+GD_SIZE(gd_dbnode, 56);
 GD_SIZE(gd_displayinfo, 56);
 GD_OFF(gd_displayinfo, propertyflags, 18);
 GD_OFF(gd_displayinfo, redbits, 40);

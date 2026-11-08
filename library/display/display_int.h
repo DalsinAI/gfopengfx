@@ -37,6 +37,10 @@ struct state {
     uint16_t spritewords;               /* 1, 2 or 4: the sprites' fetch width */
     bool hw;                            /* the display is ours: write the registers */
     gfx_semaphore sems[NSEMS];          /* the SignalSemaphores GfxBase points at (SEM_ below) */
+    gd_dbnode dbroot;                   /* GfxBase->DisplayInfoDataBase: a driver links its records under it */
+    gd_dbnode dbmon[NBUILTIN];          /* the built-in monitors' records */
+    gd_dbnode *dbmodes;                 /* their modes' records: NBUILTIN * NKEYS */
+    void *monitor_init;                 /* a MonitorSpec's xln_Init */
 };
 
 static inline gfx_base *base(gfx_env *env) { return env->base; }

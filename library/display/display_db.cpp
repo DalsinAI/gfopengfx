@@ -18,8 +18,10 @@
  * there while the driver's own MonitorSpec is on GfxBase->MonitorList (a
  * driver adds it there itself). Their timing (rows, colour clocks, first
  * row, BEAMCON0 and the SpecialMonitor's sync and blank) is the driver's:
- * MonitorInfo reads it from that MonitorSpec. Other drivers add nothing
- * yet (graphics.library's private AddDisplayInfo calls are not done). */
+ * MonitorInfo reads it from that MonitorSpec. A driver's own records (its
+ * private -744 and -750 calls, measured with tests/DriverCallLog.c on 8
+ * November 2026) come first: GfxBase->DisplayInfoDataBase is a tree it
+ * links them into itself. */
 #include "display_int.h"
 
 using namespace gd;
@@ -238,6 +240,77 @@ uint32_t extnode_size(int type)
     }
 }
 
+/* ---- the tree a driver links its records into ---- */
+
+uint32_t rec_len(const gd_queryheader *h) { return 16 + h->length * 8; }
+
+/* the mode's record that a driver has given data; null for none */
+gd_dbnode *db_find(gfx_env *env, uint32_t id)
+{
+    for (gd_dbnode *m = st(env)->dbroot.child; m; m = m->succ)
+        if (m->id == id >> 16)
+            for (gd_dbnode *n = m->child; n; n = n->succ)
+                if (n->id == id && n->data) return n;
+    return nullptr;
+}
+
+bool in_modeids(gfx_env *env, const void *h)
+{
+    const uint32_t *p = static_cast<const uint32_t *>(h), *a = st(env)->modeids;
+    return p >= a && p < a + NMODES;
+}
+
+/* a handle that is one of the tree's records with data */
+bool db_known(gfx_env *env, const void *h)
+{
+    for (gd_dbnode *m = st(env)->dbroot.child; m; m = m->succ)
+        for (gd_dbnode *n = m->child; n; n = n->succ)
+            if (n == h && n->data) return true;
+    return false;
+}
+
+gd_queryheader *db_record(gd_dbnode *n, uint32_t tagid)
+{
+    for (uint8_t *p = static_cast<uint8_t *>(n->data); p;) {
+        gd_queryheader *h = reinterpret_cast<gd_queryheader *>(p);
+        if (h->structid == tagid) return h;
+        const uint32_t *t = reinterpret_cast<const uint32_t *>(p + rec_len(h));
+        p = t[0] == GFX_TAG_MORE ? reinterpret_cast<uint8_t *>(static_cast<uintptr_t>(t[1])) : nullptr;
+    }
+    return nullptr;
+}
+
+/* a call's mode: its handle, or by ID with none; a handle of ours (a
+ * built-in mode's) has no records */
+gd_dbnode *db_target(gfx_env *env, void *handle, uint32_t id)
+{
+    if (handle) return in_modeids(env, handle) ? nullptr : static_cast<gd_dbnode *>(handle);
+    return db_find(env, id);
+}
+
+void build_tree(gfx_env *env, state *s)
+{
+    gd_dbnode *prev = nullptr, *m = s->dbmodes;
+    for (int i = 0; i < NBUILTIN; i++) {
+        gd_dbnode *mon = &s->dbmon[i], *last = nullptr;
+        mon->id = monids[i] >> 16;
+        mon->parent = &s->dbroot;
+        mon->pred = prev;
+        if (prev) prev->succ = mon;
+        else s->dbroot.child = mon;
+        prev = mon;
+        for (int j = 0; j < NKEYS; j++, m++) {
+            m->id = monids[i] | keys[j].key;
+            m->parent = mon;
+            m->pred = last;
+            if (last) last->succ = m;
+            else mon->child = m;
+            last = m;
+        }
+    }
+    (void)env;
+}
+
 void build_copinit(gfx_env *env, gd_copinit *ci)
 {
     auto mv = [](uint16_t *w, int i, uint16_t reg, uint16_t val) {
@@ -397,7 +470,9 @@ gd_extnode *gd_GfxNew(gfx_env *env, uint32_t type)
     n->subsystem = GD_SS_GRAPHICS;
     n->subtype = static_cast<uint8_t>(type);
     n->library = static_cast<int32_t>(reinterpret_cast<uintptr_t>(env->base));
-    n->init = nullptr;                  /* ABI test: OS 3.2 puts a routine here */
+    /* a monitor driver calls a MonitorSpec's (OS 3.2 puts a routine in the
+     * other types' too: ABI test; nothing has been seen to call those) */
+    n->init = type == GD_MONITOR_SPEC_TYPE ? st(env)->monitor_init : nullptr;
     if (type == GD_MONITOR_SPEC_TYPE) {
         gd_monitorspec *ms = reinterpret_cast<gd_monitorspec *>(n);
         list_init(&ms->displayinfodatabase);
@@ -485,6 +560,13 @@ gd_monitorspec *gd_OpenMonitor(gfx_env *env, const char *name, uint32_t id)
         for (int i = 0; i < NMONITORS; i++)
             if (monids[i] == mon) ms = mspec(env, i);
     }
+    /* a monitor only a driver's records know: their MonitorInfo says */
+    if (!ms && !name && id != GD_INVALID_ID)
+        for (gd_dbnode *m = st(env)->dbroot.child; m && !ms; m = m->succ)
+            if (m->id == id >> 16)
+                for (gd_dbnode *n = m->child; n && !ms; n = n->succ)
+                    if (gd_queryheader *h = n->data ? db_record(n, GD_DTAG_MNTR) : nullptr)
+                        ms = reinterpret_cast<gd_monitorinfo *>(h)->mspc;
     if (ms) ms->opencount++;
     env->permit(env->ctx);
     return ms;
@@ -506,6 +588,7 @@ void *gd_FindDisplayInfo(gfx_env *env, uint32_t id)
 {
     state *s = st(env);
     mode m;
+    if (gd_dbnode *n = db_find(env, id)) return n;
     for (int i = 0; i < NMODES; i++)
         if (s->modeids[i] == id) return find_mode(env, id, m) ? &s->modeids[i] : nullptr;
     return nullptr;
@@ -515,20 +598,40 @@ uint32_t gd_NextDisplayInfo(gfx_env *env, uint32_t id)
 {
     state *s = st(env);
     mode m;
+    uint32_t best = GD_INVALID_ID;
     /* the next one above id, in or not in the database (ABI test); modeids
      * is in order, a driver's modes there while it is */
     for (int i = 0; i < NMODES; i++)
-        if ((id == GD_INVALID_ID || s->modeids[i] > id) && find_mode(env, s->modeids[i], m)) return s->modeids[i];
-    return GD_INVALID_ID;
+        if ((id == GD_INVALID_ID || s->modeids[i] > id) && find_mode(env, s->modeids[i], m)) {
+            best = s->modeids[i];
+            break;
+        }
+    /* and the records drivers have linked in, whose order is theirs */
+    for (gd_dbnode *mon = s->dbroot.child; mon; mon = mon->succ)
+        for (gd_dbnode *n = mon->child; n; n = n->succ)
+            if (n->data && (id == GD_INVALID_ID || n->id > id) && n->id < best) best = n->id;
+    return best;
 }
 
 uint32_t gd_GetDisplayInfoData(gfx_env *env, void *handle, void *buf, uint32_t size, uint32_t tagid, uint32_t id)
 {
     state *s = st(env);
+    gd_dbnode *dn = nullptr;
     if (handle) {
         uint32_t *h = static_cast<uint32_t *>(handle);
-        if (h < s->modeids || h >= s->modeids + NMODES) return 0;
-        id = *h;
+        if (h >= s->modeids && h < s->modeids + NMODES) id = *h;
+        else if (db_known(env, handle)) dn = static_cast<gd_dbnode *>(handle);
+        else return 0;
+    }
+    if (!dn) dn = db_find(env, id);
+    if (dn) {
+        const gd_queryheader *h = buf ? db_record(dn, tagid) : nullptr;
+        if (!h) return 0;
+        /* DimensionInfo is 66 bytes without its reserved words (OS 3.2.3) */
+        uint32_t len = tagid == GD_DTAG_DIMS ? 66 : rec_len(h);
+        if (size > len) size = len;
+        copy_out(buf, h, size);
+        return size;
     }
     mode m;
     if (!buf || !find_mode(env, id, m)) return 0;
@@ -635,6 +738,9 @@ uint32_t gd_GetVPModeID(gfx_env *env, const gd_viewport *vp)
 uint32_t gd_ModeNotAvailable(gfx_env *env, uint32_t id)
 {
     mode m;
+    if (gd_dbnode *n = db_find(env, id))
+        if (const gd_queryheader *h = db_record(n, GD_DTAG_DISP))
+            return reinterpret_cast<const gd_displayinfo *>(h)->notavailable;
     if (find_mode(env, id, m)) return avail(env, m);
     for (int i = 0; i < NMONITORS; i++)
         if ((id & GD_MONITOR_ID_MASK) == monids[i] && mspec(env, i)) return GD_DI_AVAIL_NOCHIPS;
@@ -836,6 +942,74 @@ uint32_t gd_VideoControl(gfx_env *env, gfx_colormap *cm, gfx_tagitem *tags)
     return err;
 }
 
+/* ---- a monitor driver's calls ---------------------------------------------- */
+
+void gd_set_monitor_init(gfx_env *env, void *routine)
+{
+    state *s = st(env);
+    s->monitor_init = routine;
+    for (int i = 0; i < NBUILTIN; i++) s->monitors[i]->n.init = routine;
+}
+
+/* As OS 3.2.3's (tests/DriverCallLog.c): the driver's own flags
+ * (MSF_REQUEST_NTSC 1, PAL 2, SPECIAL 4, A2024 8) and the standard timing,
+ * and a SpecialMonitor if asked for; the driver overwrites most of it */
+uint32_t gd_monitor_init(gfx_env *env, gd_monitorspec *ms, uint32_t flags)
+{
+    const bool pal = (flags & 2) != 0 || (!(flags & 1) && (base(env)->displayflags & GFX_PAL));
+    ms->flags = static_cast<uint16_t>(flags);
+    ms->ratioh = ms->ratiov = 16;
+    ms->total_rows = pal ? 312 : 262;
+    ms->total_colorclocks = 226;
+    ms->denisemaxdisplaycolumn = 455;
+    ms->deniseminDisplaycolumn = 93;
+    ms->beamcon0 = (flags & 4) ? 0x1BAA : (pal ? 0x0020 : 0);
+    ms->min_row = pal ? 29 : 21;
+    ms->xoffset = 9;
+    ms->yoffset = 0;
+    rect(ms->legalview, VIEW_X, VIEW_Y, VIEW_X, VIEW_Y);
+    if ((flags & 4) && !ms->special) ms->special = reinterpret_cast<gd_specialmonitor *>(gd_GfxNew(env, GD_SPECIAL_MONITOR_TYPE));
+    return flags;
+}
+
+/* -744: a driver's data record joins its mode's, a copy of buf */
+uint32_t gd_AddDisplayInfoData(gfx_env *env, void *handle, const void *buf, uint32_t size, uint32_t tagid, uint32_t id)
+{
+    (void)tagid;                        /* buf says */
+    gd_dbnode *n = db_target(env, handle, id);
+    if (!n || !buf || size < sizeof(gd_queryheader)) return 0;
+    const uint32_t len = rec_len(static_cast<const gd_queryheader *>(buf));
+    if (len > size) return 0;
+    uint8_t *r = static_cast<uint8_t *>(alloc(env, len + 8, GFX_MEMF_PUBLIC | GFX_MEMF_CLEAR));
+    if (!r) return 0;
+    copy_out(r, buf, len);
+    uint32_t *t = reinterpret_cast<uint32_t *>(r + len);
+    env->forbid(env->ctx);
+    if (n->data) {
+        t[0] = GFX_TAG_MORE;
+        t[1] = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(n->data));
+    }
+    n->more = GFX_TAG_MORE;
+    n->data = r;
+    env->permit(env->ctx);
+    return size;
+}
+
+/* -750: the driver changes a record. A MonitorInfo keeps its header and
+ * Mspc (OS 3.2.3 answers 20 bytes fewer for it) */
+uint32_t gd_SetDisplayInfoData(gfx_env *env, void *handle, const void *buf, uint32_t size, uint32_t tagid, uint32_t id)
+{
+    gd_dbnode *n = db_target(env, handle, id);
+    if (!n || !n->data || !buf) return 0;
+    gd_queryheader *h = db_record(n, tagid);
+    if (!h) return 0;
+    const uint32_t skip = tagid == GD_DTAG_MNTR ? 20 : 0, len = rec_len(h);
+    if (size > len) size = len;
+    if (size <= skip) return 0;
+    copy_out(reinterpret_cast<uint8_t *>(h) + skip, static_cast<const uint8_t *>(buf) + skip, size - skip);
+    return size - skip;
+}
+
 /* ---- the display's start ---------------------------------------------------- */
 
 int gd_init(gfx_env *env, int own_hw)
@@ -854,7 +1028,12 @@ int gd_init(gfx_env *env, int own_hw)
     gb->copinit = s->copinit;
     gb->simplesprites = reinterpret_cast<void **>(s->sprites);
     gb->hash_table = reinterpret_cast<int16_t *>(s->hash);
-    gb->displayinfodatabase = s->modeids;
+    s->dbmodes = static_cast<gd_dbnode *>(alloc(env, NBUILTIN * NKEYS * sizeof(gd_dbnode), GFX_MEMF_PUBLIC | GFX_MEMF_CLEAR));
+    if (!s->dbmodes) {
+        gd_exit(env);
+        return 0;
+    }
+    gb->displayinfodatabase = &s->dbroot;
     for (int i = 0; i < NSEMS; i++)
         if (env->sem_init) env->sem_init(env->ctx, &s->sems[i]);
     gb->lastchancememory = &s->sems[SEM_LASTCHANCE];
@@ -865,6 +1044,7 @@ int gd_init(gfx_env *env, int own_hw)
     for (int i = 0; i < NMONITORS; i++)
         for (int j = 0; j < NKEYS; j++)
             if (keys[j].on & monon[i]) s->modeids[n++] = monids[i] | keys[j].key;
+    build_tree(env, s);
 
     /* the chips: Agnus says PAL or NTSC */
     unsigned agnus = (env->chip_read(env->ctx, GD_VPOSR) >> 8) & 0x7F;
@@ -922,6 +1102,17 @@ void gd_exit(gfx_env *env)
             s->hash[i] = a->next;
             release(env, a, sizeof(assoc));
         }
+    /* the data records -744 allocated; a driver's own nodes are its */
+    for (gd_dbnode *m = s->dbroot.child; m; m = m->succ)
+        for (gd_dbnode *n = m->child; n; n = n->succ)
+            for (uint8_t *p = static_cast<uint8_t *>(n->data); p;) {
+                const uint32_t len = rec_len(reinterpret_cast<gd_queryheader *>(p));
+                const uint32_t *t = reinterpret_cast<const uint32_t *>(p + len);
+                uint8_t *next = t[0] == GFX_TAG_MORE ? reinterpret_cast<uint8_t *>(static_cast<uintptr_t>(t[1])) : nullptr;
+                release(env, p, len + 8);
+                p = next;
+            }
+    release(env, s->dbmodes, NBUILTIN * NKEYS * sizeof(gd_dbnode));
     if (gb->copinit == s->copinit) gb->copinit = nullptr;
     gb->simplesprites = nullptr;
     gb->hash_table = nullptr;

@@ -466,14 +466,9 @@ uint32_t gfx_lvo_ScalerDiv(GFX_REG(d0, uint32_t factor),
     return gfx_ScalerDiv(gfx_env_of(gb), (uint16_t)factor, (uint16_t)numerator, (uint16_t)denominator);
 }
 
-/* private -738: a private slot of OS 3.2's; answers 0 */
+/* private -738: a private slot of OS 3.2's; OS 3.2.3's monitor drivers never
+ * call it (-744 and -750 are the display's: display_lvo.c); answers 0 */
 uint32_t gfx_lvo_private_738(void) { return 0; }
-
-/* private -744: a private slot of OS 3.2's; answers 0 */
-uint32_t gfx_lvo_private_744(void) { return 0; }
-
-/* private -750: a private slot of OS 3.2's; answers 0 */
-uint32_t gfx_lvo_private_750(void) { return 0; }
 
 int32_t gfx_lvo_ReadPixelLine8(GFX_REG(a0, struct gfx_rastport *rp),
     GFX_REG(d0, uint32_t x),

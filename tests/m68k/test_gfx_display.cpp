@@ -1366,6 +1366,95 @@ static void monitors31()
     printf("monitors done\n");
 }
 
+/* a driver's own records, as OS 3.2.3's drivers link them in (measured
+ * with tests/DriverCallLog.c): a monitor's and its modes' under the
+ * database's root, their data by the private -744, changed by -750 */
+static void driver_records()
+{
+    tused = 0;
+    boot(2, true);
+    gd_dbnode *root = (gd_dbnode *)GB->displayinfodatabase;
+    int mons = 0, modes = 0;
+    gd_dbnode *last = nullptr;
+    for (gd_dbnode *m = root->child; m; last = m, m = m->succ) {
+        CHECK(m->parent == root && m->id == (uint32_t)mons, "the database's root has the built-in monitors, in order");
+        mons++;
+        for (gd_dbnode *c = m->child; c; c = c->succ) {
+            CHECK(c->parent == m && (c->id >> 16) == m->id && !c->data, "a built-in mode's record");
+            modes++;
+        }
+    }
+    CHECK(mons == 3 && modes == 90 && last && !last->succ, "3 monitors and 90 modes in the tree");
+
+    /* the driver's: a monitor 0xB, two modes */
+    static gd_dbnode mon, a, b;
+    memset(&mon, 0, sizeof mon); memset(&a, 0, sizeof a); memset(&b, 0, sizeof b);
+    mon.id = 0xB; mon.parent = root; mon.pred = last; last->succ = &mon;
+    mon.child = &a; a.parent = b.parent = &mon; a.succ = &b; b.pred = &a;
+    a.id = 0x000B1000; b.id = 0x000B0800;
+    gd_monitorspec *ms = (gd_monitorspec *)gd_GfxNew(&E, GD_MONITOR_SPEC_TYPE);
+    gd_displayinfo di;
+    memset(&di, 0, sizeof di);
+    di.header = { GD_DTAG_DISP, a.id, GFX_TAG_SKIP, 4 };
+    di.notavailable = 0x1234;
+    gd_monitorinfo mi;
+    memset(&mi, 0, sizeof mi);
+    mi.header = { GD_DTAG_MNTR, a.id, GFX_TAG_SKIP, 9 };
+    mi.mspc = ms;
+    mi.totalrows = 500;
+    CHECK(gd_AddDisplayInfoData(&E, &a, &mi, 0x60, GD_DTAG_MNTR, GD_INVALID_ID) == 0x60, "-744 answers the size");
+    CHECK(gd_AddDisplayInfoData(&E, &a, &di, 0x38, GD_DTAG_DISP, GD_INVALID_ID) == 0x38, "-744 of a second record");
+    CHECK(gd_AddDisplayInfoData(&E, nullptr, &di, 0x38, GD_DTAG_DISP, 0x000B7000) == 0, "-744 of no such mode");
+    CHECK(gd_AddDisplayInfoData(&E, gd_FindDisplayInfo(&E, 0x00021000), &di, 0x38, GD_DTAG_DISP, GD_INVALID_ID) == 0,
+          "-744 on a built-in mode's handle");
+    void *h = gd_FindDisplayInfo(&E, a.id);
+    CHECK(h == &a && !gd_FindDisplayInfo(&E, b.id), "FindDisplayInfo: a mode with data, not one without");
+    CHECK(gd_NextDisplayInfo(&E, 0x00029000) != 0 && gd_ModeNotAvailable(&E, a.id) == 0x1234, "ModeNotAvailable is the record's");
+    gd_displayinfo got;
+    memset(&got, 0, sizeof got);
+    CHECK(gd_GetDisplayInfoData(&E, h, &got, 0x38, GD_DTAG_DISP, 0) == 0x30 && got.notavailable == 0x1234, "DTAG_DISP is 0x30 bytes");
+    memset(&got, 0, sizeof got);
+    CHECK(gd_GetDisplayInfoData(&E, nullptr, &got, 0x38, GD_DTAG_DISP, a.id) == 0x30 && got.notavailable == 0x1234, "by ID");
+    CHECK(gd_GetDisplayInfoData(&E, h, &got, 0x38, GD_DTAG_DIMS, 0) == 0, "no such record");
+    CHECK(gd_OpenMonitor(&E, 0, 0x000B1000) == ms, "OpenMonitor: the mode's MonitorInfo says");
+    gd_CloseMonitor(&E, ms);
+    /* every ID once, the driver's after the built-ins' */
+    int n = 0, seen = 0;
+    for (uint32_t id = GD_INVALID_ID; (id = gd_NextDisplayInfo(&E, id)) != GD_INVALID_ID;) {
+        n++;
+        if (id == a.id) seen++;
+    }
+    CHECK(n == 91 && seen == 1, "NextDisplayInfo: 90 and the driver's one");
+    di.notavailable = 0x77;
+    CHECK(gd_SetDisplayInfoData(&E, h, &di, 0x30, GD_DTAG_DISP, 0) == 0x30, "-750 answers the bytes");
+    CHECK(gd_ModeNotAvailable(&E, a.id) == 0x77, "-750 changed the record");
+    gd_monitorinfo mg;
+    memset(&mg, 0, sizeof mg);
+    mg.header = { GD_DTAG_MNTR, a.id, GFX_TAG_SKIP, 9 };
+    mg.totalrows = 600;
+    CHECK(gd_SetDisplayInfoData(&E, nullptr, &mg, 0x58, GD_DTAG_MNTR, a.id) == 0x44, "-750 of a MonitorInfo: 20 bytes fewer");
+    memset(&mi, 0, sizeof mi);
+    CHECK(gd_GetDisplayInfoData(&E, h, &mi, 0x60, GD_DTAG_MNTR, 0) == 0x58 && mi.totalrows == 600 && mi.mspc == ms,
+          "its rows changed, its Mspc kept");
+    CHECK(gd_SetDisplayInfoData(&E, h, &mg, 0x58, GD_DTAG_NAME, 0) == 0, "-750 of a record it has not");
+    gd_GfxFree(&E, &ms->n);
+
+    /* xln_Init: what a driver asks of a new MonitorSpec */
+    static int routine;
+    gd_set_monitor_init(&E, &routine);
+    CHECK(((gd_monitorspec *)GB->default_monitor)->n.init == &routine, "the built-in monitors have the routine");
+    ms = (gd_monitorspec *)gd_GfxNew(&E, GD_MONITOR_SPEC_TYPE);
+    CHECK(ms->n.init == &routine, "GfxNew leaves it in a MonitorSpec");
+    CHECK(gd_monitor_init(&E, ms, 0x16) == 0x16 && ms->flags == 0x16 && ms->total_rows == 312 && ms->min_row == 29
+          && ms->beamcon0 == 0x1BAA && ms->ratioh == 16 && ms->special, "xln_Init on PAL with a SpecialMonitor");
+    gd_GfxFree(&E, &ms->special->n);
+    ms->special = nullptr;
+    CHECK(gd_monitor_init(&E, ms, 1) == 1 && ms->total_rows == 262 && ms->min_row == 21 && !ms->special, "xln_Init on NTSC, no SpecialMonitor");
+    gd_GfxFree(&E, &ms->n);
+    shutdown();
+    printf("driver records done\n");
+}
+
 /* gfopengfx.library next to OS 3.2's graphics.library: the same calls, no
  * custom chip register written */
 static void side_by_side()
@@ -1393,6 +1482,7 @@ int main(void)
     for (int c = 0; c < 3; c++) fetch_modes(c);
     for (int c = 0; c < 3; c++) wide_sprites(c);
     monitors31();
+    driver_records();
     side_by_side();
     printf("%lu checks, %lu failed\n", checks, fails);
     return fails != 0;
