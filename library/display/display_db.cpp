@@ -280,6 +280,46 @@ gd_queryheader *db_record(gd_dbnode *n, uint32_t tagid)
     return nullptr;
 }
 
+/* A monitor's modes share one MonitorInfo, kept on whichever mode it was
+ * added to (OS 3.2.3: the driver adds it to the first) */
+gd_queryheader *db_record_shared(gd_dbnode *n, uint32_t tagid)
+{
+    gd_queryheader *h = db_record(n, tagid);
+    if (h || tagid != GD_DTAG_MNTR || !n->parent) return h;
+    for (gd_dbnode *c = n->parent->child; c && !h; c = c->succ)
+        if (c->data) h = db_record(c, tagid);
+    return h;
+}
+
+/* a driver's DimensionInfo, as GetDisplayInfoData answers it: the record
+ * has longwords in ticks, Nominal, MaxOScan and VideoOScan, and each comes
+ * out divided by the mode's resolution; the text and standard overscans
+ * are the nominal (OS 3.2.3, MonitorProbe) */
+uint32_t db_dims(gd_dbnode *n, const gd_queryheader *h, gd_dimensioninfo &out)
+{
+    const gd_queryheader *dh = db_record(n, GD_DTAG_DISP);
+    const int rx = dh ? reinterpret_cast<const gd_displayinfo *>(dh)->resolution.x : 1;
+    const int ry = dh ? reinterpret_cast<const gd_displayinfo *>(dh)->resolution.y : 1;
+    const uint8_t *p = reinterpret_cast<const uint8_t *>(h) + sizeof *h;
+    auto word = [&](int o) { return static_cast<uint16_t>(p[o] << 8 | p[o + 1]); };
+    auto lng = [&](int o) { return static_cast<int32_t>(static_cast<uint32_t>(word(o)) << 16 | word(o + 2)); };
+    auto box = [&](gfx_rectangle &r, int o) {
+        rect(r, lng(o) / (rx ? rx : 1), lng(o + 4) / (ry ? ry : 1), lng(o + 8) / (rx ? rx : 1), lng(o + 12) / (ry ? ry : 1));
+    };
+    zero(&out, sizeof out);
+    out.header = *h;
+    out.maxdepth = word(0);
+    out.minrasterwidth = word(2);
+    out.minrasterheight = word(4);
+    out.maxrasterwidth = word(6);
+    out.maxrasterheight = word(8);
+    box(out.nominal, 10);
+    box(out.maxoscan, 26);
+    box(out.videooscan, 42);
+    out.txtoscan = out.stdoscan = out.nominal;
+    return 66;                          /* the fields above */
+}
+
 /* a call's mode: its handle, or by ID with none; a handle of ours (a
  * built-in mode's) has no records */
 gd_dbnode *db_target(gfx_env *env, void *handle, uint32_t id)
@@ -565,7 +605,7 @@ gd_monitorspec *gd_OpenMonitor(gfx_env *env, const char *name, uint32_t id)
         for (gd_dbnode *m = st(env)->dbroot.child; m && !ms; m = m->succ)
             if (m->id == id >> 16)
                 for (gd_dbnode *n = m->child; n && !ms; n = n->succ)
-                    if (gd_queryheader *h = n->data ? db_record(n, GD_DTAG_MNTR) : nullptr)
+                    if (gd_queryheader *h = n->data ? db_record_shared(n, GD_DTAG_MNTR) : nullptr)
                         ms = reinterpret_cast<gd_monitorinfo *>(h)->mspc;
     if (ms) ms->opencount++;
     env->permit(env->ctx);
@@ -625,12 +665,17 @@ uint32_t gd_GetDisplayInfoData(gfx_env *env, void *handle, void *buf, uint32_t s
     }
     if (!dn) dn = db_find(env, id);
     if (dn) {
-        const gd_queryheader *h = buf ? db_record(dn, tagid) : nullptr;
+        const gd_queryheader *h = buf ? db_record_shared(dn, tagid) : nullptr;
         if (!h) return 0;
-        /* DimensionInfo is 66 bytes without its reserved words (OS 3.2.3) */
-        uint32_t len = tagid == GD_DTAG_DIMS ? 66 : rec_len(h);
+        uint32_t len = rec_len(h);
+        const void *from = h;
+        gd_dimensioninfo dims;
+        if (tagid == GD_DTAG_DIMS) {
+            len = db_dims(dn, h, dims);
+            from = &dims;
+        }
         if (size > len) size = len;
-        copy_out(buf, h, size);
+        copy_out(buf, from, size);
         return size;
     }
     mode m;
@@ -995,19 +1040,18 @@ uint32_t gd_AddDisplayInfoData(gfx_env *env, void *handle, const void *buf, uint
     return size;
 }
 
-/* -750: the driver changes a record. A MonitorInfo keeps its header and
- * Mspc (OS 3.2.3 answers 20 bytes fewer for it) */
+/* -750: the driver changes a record, a monitor's shared MonitorInfo too
+ * (which it writes whole, Mspc and all, yet OS 3.2.3 answers 20 fewer) */
 uint32_t gd_SetDisplayInfoData(gfx_env *env, void *handle, const void *buf, uint32_t size, uint32_t tagid, uint32_t id)
 {
     gd_dbnode *n = db_target(env, handle, id);
     if (!n || !n->data || !buf) return 0;
-    gd_queryheader *h = db_record(n, tagid);
+    gd_queryheader *h = db_record_shared(n, tagid);
     if (!h) return 0;
-    const uint32_t skip = tagid == GD_DTAG_MNTR ? 20 : 0, len = rec_len(h);
+    const uint32_t len = rec_len(h);
     if (size > len) size = len;
-    if (size <= skip) return 0;
-    copy_out(reinterpret_cast<uint8_t *>(h) + skip, static_cast<const uint8_t *>(buf) + skip, size - skip);
-    return size - skip;
+    copy_out(h, buf, size);
+    return tagid == GD_DTAG_MNTR && size > 20 ? size - 20 : size;
 }
 
 /* ---- the display's start ---------------------------------------------------- */

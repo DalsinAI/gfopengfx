@@ -1432,10 +1432,32 @@ static void driver_records()
     memset(&mg, 0, sizeof mg);
     mg.header = { GD_DTAG_MNTR, a.id, GFX_TAG_SKIP, 9 };
     mg.totalrows = 600;
+    mg.mspc = ms;
     CHECK(gd_SetDisplayInfoData(&E, nullptr, &mg, 0x58, GD_DTAG_MNTR, a.id) == 0x44, "-750 of a MonitorInfo: 20 bytes fewer");
     memset(&mi, 0, sizeof mi);
     CHECK(gd_GetDisplayInfoData(&E, h, &mi, 0x60, GD_DTAG_MNTR, 0) == 0x58 && mi.totalrows == 600 && mi.mspc == ms,
-          "its rows changed, its Mspc kept");
+          "its rows and Mspc changed");
+    /* one MonitorInfo for the monitor's modes; a DimensionInfo in ticks */
+    gd_displayinfo bd;
+    memset(&bd, 0, sizeof bd);
+    bd.header = { GD_DTAG_DISP, b.id, GFX_TAG_SKIP, 4 };
+    bd.resolution = { 22, 44 };
+    CHECK(gd_AddDisplayInfoData(&E, &b, &bd, 0x30, GD_DTAG_DISP, GD_INVALID_ID) == 0x30, "the second mode's record");
+    memset(&mi, 0, sizeof mi);
+    CHECK(gd_GetDisplayInfoData(&E, nullptr, &mi, 0x60, GD_DTAG_MNTR, b.id) == 0x58 && mi.totalrows == 600, "a mode shares its monitor's MonitorInfo");
+    static const uint8_t tick[80] = {
+        0x80, 0x00, 0x10, 0x00, 0x00, 0x0B, 0x08, 0x00, 0, 0, 0, 3, 0, 0, 0, 8,
+        0, 8, 0, 0x10, 0, 1, 0x3F, 0xF0, 0x40, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x36, 0xFF, 0, 0, 0x2B, 0xFF,
+        0xFF, 0xFF, 0xFC, 0x90, 0xFF, 0xFF, 0xFE, 0x5E, 0, 0, 0x3A, 0x6F, 0, 0, 0x2D, 0xA1,
+        0xFF, 0xFF, 0xF7, 0x10, 0xFF, 0xFF, 0xFE, 0x5E, 0, 0, 0x3A, 0x6F, 0, 0, 0x2D, 0xA1 };
+    CHECK(gd_AddDisplayInfoData(&E, &b, tick, 0x58, GD_DTAG_DIMS, GD_INVALID_ID) == 0x58, "a DimensionInfo in ticks");
+    gd_dimensioninfo dm;
+    memset(&dm, 0, sizeof dm);
+    CHECK(gd_GetDisplayInfoData(&E, nullptr, &dm, 0x58, GD_DTAG_DIMS, b.id) == 66 && dm.maxdepth == 8
+          && dm.nominal.maxx == 639 && dm.nominal.maxy == 255 && dm.maxoscan.minx == -40 && dm.maxoscan.miny == -9
+          && dm.maxoscan.maxx == 679 && dm.maxoscan.maxy == 265 && dm.videooscan.minx == -104
+          && dm.stdoscan.maxx == 639 && dm.txtoscan.maxy == 255, "DTAG_DIMS divides the ticks by the resolution");
     CHECK(gd_SetDisplayInfoData(&E, h, &mg, 0x58, GD_DTAG_NAME, 0) == 0, "-750 of a record it has not");
     gd_GfxFree(&E, &ms->n);
 
