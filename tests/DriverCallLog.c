@@ -161,7 +161,7 @@ static void report(const char *calls)
     for (i = 0; i < nrecs && i < NRECS; i++) {
         struct rec *r = &recs[i];
         if (!wanted(calls, i)) continue;
-        Printf("CALL %ld lvo %ld task %08lx ret %08lx res %08lx\n", i, (LONG)r->lvo, (LONG)r->task, r->ret, r->res);
+        Printf("CALL %ld lvo %ld task %08lx ret %08lx res %08lx in %08lx\n", i, (LONG)r->lvo, (LONG)r->task, r->ret, r->res, r->r[0]);
         Printf("  d0 %08lx d1 %08lx d2 %08lx d3 %08lx a0 %08lx a1 %08lx a2 %08lx a3 %08lx\n", r->r[0], r->r[1], r->r[2],
                r->r[3], r->r[8], r->r[9], r->r[10], r->r[11]);
         Printf("  stack %08lx %08lx %08lx\n", r->stack[0], r->stack[1], r->stack[2]);
