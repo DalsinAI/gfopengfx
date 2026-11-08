@@ -2,7 +2,7 @@
 /* DriverCallLog: what a program asks of graphics.library's display calls.
  * Copyright (c) 2026 AmiCradle Team. MIT.
  *
- *   DriverCallLog [DUMP=addr] [LEN=n] [CMD=...]
+ *   DriverCallLog [DUMP=addr] [LEN=n] [CALLS=first-last,...] [CMD=...]
  * patches OpenMonitor, CloseMonitor, FindDisplayInfo, NextDisplayInfo,
  * GetDisplayInfoData, GfxNew, GfxFree, GfxAssociate, GfxLookUp and the
  * private -738, -744 and -750 with SetFunction, runs CMD (a monitor driver,
@@ -130,11 +130,27 @@ static void hex(const char *n, const UBYTE *d, int len)
     Printf("\n");
 }
 
-static void report(void)
+/* whether CALLS (none: every call) has call i */
+static int wanted(const char *c, ULONG i)
+{
+    if (!c) return 1;
+    while (*c) {
+        char *e;
+        ULONG a = strtoul(c, &e, 10), b = a;
+        if (*e == '-') b = strtoul(e + 1, &e, 10);
+        if (i >= a && i <= b) return 1;
+        if (*e != ',') break;
+        c = e + 1;
+    }
+    return 0;
+}
+
+static void report(const char *calls)
 {
     ULONG i;
     for (i = 0; i < nrecs && i < NRECS; i++) {
         struct rec *r = &recs[i];
+        if (!wanted(calls, i)) continue;
         Printf("CALL %ld lvo %ld task %08lx ret %08lx res %08lx\n", i, (LONG)r->lvo, (LONG)r->task, r->ret, r->res);
         Printf("  d0 %08lx d1 %08lx d2 %08lx d3 %08lx a0 %08lx a1 %08lx a2 %08lx a3 %08lx\n", r->r[0], r->r[1], r->r[2],
                r->r[3], r->r[8], r->r[9], r->r[10], r->r[11]);
@@ -183,15 +199,15 @@ static void database(void)
 
 int main(void)
 {
-    LONG args[3] = { 0, 0, 0 };
-    struct RDArgs *rd = ReadArgs("DUMP/K,LEN/K/N,CMD/F", args, NULL);
+    LONG args[4] = { 0, 0, 0, 0 };
+    struct RDArgs *rd = ReadArgs("DUMP/K,LEN/K/N,CALLS/K,CMD/F", args, NULL);
     int i;
     if (!rd) {
         PrintFault(IoErr(), "DriverCallLog");
         return 10;
     }
     Printf("graphics %ld.%ld\n", (LONG)GfxBase->LibNode.lib_Version, (LONG)GfxBase->LibNode.lib_Revision);
-    if (args[2]) {
+    if (args[3]) {
         struct TagItem t[] = { { SYS_Input, 0 }, { SYS_Output, 0 }, { TAG_DONE, 0 } };
         LONG rc;
         recs = AllocMem(NRECS * sizeof(struct rec), MEMF_ANY | MEMF_CLEAR);
@@ -203,10 +219,10 @@ int main(void)
         t[1].ti_Data = (ULONG)Open("NIL:", MODE_OLDFILE);
         for (i = 0; i < NCALLS; i++)
             orig[i] = (ULONG)SetFunction((struct Library *)GfxBase, lvos[i], (ULONG (*)())(stubs + 10 * i));
-        rc = SystemTagList((STRPTR)args[2], t);
+        rc = SystemTagList((STRPTR)args[3], t);
         for (i = 0; i < NCALLS; i++) SetFunction((struct Library *)GfxBase, lvos[i], (ULONG (*)())orig[i]);
         Printf("rc %ld\n", rc);
-        report();
+        report((const char *)args[2]);
         FreeMem(recs, NRECS * sizeof(struct rec));
     }
     database();
