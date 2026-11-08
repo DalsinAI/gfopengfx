@@ -37,6 +37,7 @@ struct rec {
     APTR task;
     ULONG ret;
     ULONG r[15];
+    ULONG stack[3];     /* what the caller pushed */
     ULONG res;
     UBYTE before[3][NDUMP];
     UBYTE after[2][NDUMP];
@@ -104,6 +105,7 @@ ULONG log_entry(ULONG *f)
         r->task = FindTask(NULL);
         r->ret = f[18];
         for (k = 0; k < 15; k++) r->r[k] = f[k];
+        for (k = 0; k < 3; k++) r->stack[k] = f[19 + k];
         for (k = 0; k < 3; k++)
             if (snap(r->before[k], f[8 + k])) r->valid |= 1 << k;
     }
@@ -124,7 +126,7 @@ void log_exit(ULONG *f)
         if (r->lvo == -660 && r->r[0] == 4 && f[0]) {
             struct ExtendedNode *x = (struct ExtendedNode *)f[0];
             orig[NCALLS] = (ULONG)x->xln_Init;
-            x->xln_Init = (LONG (*)())(stubs + 10 * NCALLS);
+            x->xln_Init = (LONG (*)(struct ExtendedNode *, UWORD))(stubs + 10 * NCALLS);
         }
     }
 }
@@ -162,6 +164,7 @@ static void report(const char *calls)
         Printf("CALL %ld lvo %ld task %08lx ret %08lx res %08lx\n", i, (LONG)r->lvo, (LONG)r->task, r->ret, r->res);
         Printf("  d0 %08lx d1 %08lx d2 %08lx d3 %08lx a0 %08lx a1 %08lx a2 %08lx a3 %08lx\n", r->r[0], r->r[1], r->r[2],
                r->r[3], r->r[8], r->r[9], r->r[10], r->r[11]);
+        Printf("  stack %08lx %08lx %08lx\n", r->stack[0], r->stack[1], r->stack[2]);
         if (r->valid & 1) hex("a0", r->before[0], NDUMP);
         if (r->valid & 2) hex("a1", r->before[1], NDUMP);
         if (r->valid & 4) hex("a2", r->before[2], NDUMP);
