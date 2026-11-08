@@ -8,7 +8,7 @@
  * private -738, -744 and -750 with SetFunction, runs CMD (a monitor driver,
  * say), takes the patches off and prints every call: its registers, the
  * memory a0, a1 and a2 point at before and a0's and a1's after, and the
- * result with the memory it points at. Then the display database's head and
+ * result with the memory it points at (lvo 0 is a MonitorSpec's xln_Init). Then the display database's head and
  * each MonitorSpec's list, or with DUMP that memory instead, each with what
  * its longwords point at. It only observes. Run it on the ROM to be measured. */
 #include <exec/types.h>
@@ -16,6 +16,7 @@
 #include <exec/execbase.h>
 #include <graphics/gfxbase.h>
 #include <graphics/monitor.h>
+#include <graphics/gfxnodes.h>
 #include <dos/dos.h>
 #include <dos/dostags.h>
 #include <dos/rdargs.h>
@@ -27,8 +28,9 @@
 extern struct GfxBase *GfxBase;
 
 #define NCALLS 12
-#define NRECS 4000
-#define NDUMP 64
+#define NSTUBS 13     /* the last is a MonitorSpec's xln_Init, as GfxNew left it */
+#define NRECS 1200
+#define NDUMP 192
 
 struct rec {
     WORD lvo;
@@ -43,7 +45,7 @@ struct rec {
 };
 
 static const WORD lvos[NCALLS] = { -660, -666, -672, -702, -714, -720, -726, -732, -738, -744, -750, -756 };
-static ULONG orig[NCALLS];
+static ULONG orig[NSTUBS];
 static struct rec *recs;
 static ULONG nrecs;
 
@@ -52,7 +54,7 @@ static ULONG nrecs;
  * rts leaves through */
 #define S(n) "	move.l #" #n ",-(%sp)\n	bra.w common\n"
 __asm__("	.text\n	.even\n	.globl _stubs\n_stubs:\n"
-        S(0) S(1) S(2) S(3) S(4) S(5) S(6) S(7) S(8) S(9) S(10) S(11)
+        S(0) S(1) S(2) S(3) S(4) S(5) S(6) S(7) S(8) S(9) S(10) S(11) S(12)
         "common:\n"
         "	pea back(%pc)\n"
         "	subq.l #4,%sp\n"
@@ -98,7 +100,7 @@ ULONG log_entry(ULONG *f)
     if (i < NRECS) {
         int k;
         r = &recs[i];
-        r->lvo = lvos[n];
+        r->lvo = n < NCALLS ? lvos[n] : 0;
         r->task = FindTask(NULL);
         r->ret = f[18];
         for (k = 0; k < 15; k++) r->r[k] = f[k];
@@ -118,6 +120,12 @@ void log_exit(ULONG *f)
         for (k = 0; k < 2; k++)
             if (snap(r->after[k], r->r[8 + k])) r->valid |= 8 << k;
         if (snap(r->resmem, f[0])) r->valid |= 32;
+        /* GfxNew's MonitorSpec: through our stub when the driver calls its xln_Init */
+        if (r->lvo == -660 && r->r[0] == 4 && f[0]) {
+            struct ExtendedNode *x = (struct ExtendedNode *)f[0];
+            orig[NCALLS] = (ULONG)x->xln_Init;
+            x->xln_Init = (LONG (*)())(stubs + 10 * NCALLS);
+        }
     }
 }
 
