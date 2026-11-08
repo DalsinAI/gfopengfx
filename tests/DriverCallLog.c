@@ -126,7 +126,7 @@ void log_exit(ULONG *f)
         if (r->lvo == -660 && r->r[0] == 4 && f[0]) {
             struct ExtendedNode *x = (struct ExtendedNode *)f[0];
             orig[NCALLS] = (ULONG)x->xln_Init;
-            x->xln_Init = (LONG (*)(struct ExtendedNode *, UWORD))(stubs + 10 * NCALLS);
+            *(APTR *)&x->xln_Init = (APTR)(stubs + 10 * NCALLS);
         }
     }
 }
