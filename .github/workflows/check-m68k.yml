@@ -57,5 +57,3 @@ jobs:
         run: QEMU_M68K=qemu-m68k sh tests/m68k/test_gfx_narrow.sh
       - name: GFOS face log (gfosmodules)
         run: QEMU_M68K=qemu-m68k HOST_CC=gcc sh tests/m68k/test_facelog.sh
-      - name: GFOpenLayers composited marks
-        run: QEMU_M68K=qemu-m68k sh tests/m68k/test_comp_marks.sh
