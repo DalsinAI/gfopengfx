@@ -312,6 +312,21 @@ FACELOG_FN uint32_t facelog_parse(const char *s)
     return mask;
 }
 
+/* A task's tag: the task's name pointer, the Shell's command-name buffer and the bytes of the command
+ * name (a BSTR, length in byte 0), mixed FNV-1a style. One Shell keeps the same task name and buffer for
+ * every program it runs, so the name's bytes are what tell Mandel from Shapes. At most 255 byte reads:
+ * still a leaf (no locks, no calls, no waits). */
+FACELOG_FN uint32_t facelog_tag_of(const void *task_name, const unsigned char *cmd)
+{
+    uint32_t h = 2166136261u ^ (uint32_t)(uintptr_t)task_name;
+    int i, len;
+    if (!cmd) return h;
+    h = (h ^ (uint32_t)(uintptr_t)cmd) * 16777619u;
+    len = cmd[0];
+    for (i = 0; i <= len; i++) h = (h ^ cmd[i]) * 16777619u;
+    return h;
+}
+
 /* ---- on the Amiga: the ops over exec ---- */
 #if defined(FACELOG_AMIGA) || defined(FACELOG_TOOL)
 #include <exec/types.h>
@@ -359,7 +374,7 @@ FACELOG_FN uint32_t facelog_a_tag(void *ctx, const void *task)
     const struct Task *t = (const struct Task *)task;
     const UBYTE *cmd = facelog_a_cmd(t);
     (void)ctx;
-    return (uint32_t)(uintptr_t)t->tc_Node.ln_Name ^ (cmd ? (uint32_t)(uintptr_t)cmd + cmd[0] : 0);
+    return facelog_tag_of(t->tc_Node.ln_Name, cmd);
 }
 
 /* A Shell's program: its command name without the path; anything else: the task's name. */

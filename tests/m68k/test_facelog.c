@@ -176,6 +176,52 @@ int main(void)
     facelog_note_n(fl, &ops, FL_READPIXEL, 9, 1);
     CHECK(fl->ntasks == 0, "a bad call kind or screen is ignored");
 
+    /* the real tag: one Shell (same task name, same command-name buffer) runs Mandel, then Shapes */
+    {
+        static const char shell[] = "Shell Process";
+        unsigned char cmdbuf[256];
+        uint32_t t_mandel, t_shapes, t_mandel2, t_other_cli, t_plain;
+        cmdbuf[0] = 6; memcpy(cmdbuf + 1, "Mandel", 6);
+        t_mandel = facelog_tag_of(shell, cmdbuf);
+        cmdbuf[0] = 6; memcpy(cmdbuf + 1, "Shapes", 6);
+        t_shapes = facelog_tag_of(shell, cmdbuf);
+        CHECK(t_mandel != t_shapes, "tag: two same-length programs in one Shell differ");
+        cmdbuf[0] = 6; memcpy(cmdbuf + 1, "Mandel", 6);
+        t_mandel2 = facelog_tag_of(shell, cmdbuf);
+        CHECK(t_mandel2 == t_mandel, "tag: the same program again in that Shell is the same task");
+        {
+            unsigned char other[256];
+            other[0] = 6; memcpy(other + 1, "Mandel", 6);
+            t_other_cli = facelog_tag_of(shell, other);
+            CHECK(t_other_cli != t_mandel, "tag: the same program in another Shell differs");
+        }
+        cmdbuf[0] = 0;
+        t_plain = facelog_tag_of(shell, cmdbuf);
+        CHECK(t_plain != t_mandel && facelog_tag_of(shell, 0) != t_plain, "tag: an empty command name and no CLI differ");
+        /* end to end: both run as the one Shell task, each counted under its own name */
+        {
+            struct facelog_task snap[FACELOG_TASKS];
+            int k, sm = -1, ss = -1;
+            facelog_reset(fl, &ops);
+            facelog_set(fl, FACELOG_ALL);
+            cur = &tasks[0];
+            strcpy(cur->name, "Mandel"); cur->tag = t_mandel;
+            facelog_note_n(fl, &ops, FL_DIRECT_WRITE, FL_SCREEN_PUBLIC, 3);
+            strcpy(cur->name, "Shapes"); cur->tag = t_shapes;
+            facelog_note_n(fl, &ops, FL_DIRECT_WRITE, FL_SCREEN_PUBLIC, 5);
+            n = facelog_snapshot(fl, &ops, snap, FACELOG_TASKS);
+            for (k = 0; k < n; k++) {
+                if (!strcmp(snap[k].name, "Mandel")) sm = k;
+                if (!strcmp(snap[k].name, "Shapes")) ss = k;
+            }
+            CHECK(n == 2 && sm >= 0 && ss >= 0, "tag: Mandel then Shapes in one Shell are two rows");
+            CHECK(sm >= 0 && ss >= 0 && snap[sm].counts[FL_DIRECT_WRITE][FL_SCREEN_PUBLIC] == 3 &&
+                  snap[ss].counts[FL_DIRECT_WRITE][FL_SCREEN_PUBLIC] == 5, "tag: each keeps its own count");
+            facelog_reset(fl, &ops);
+            facelog_set(fl, 0);
+        }
+    }
+
     printf("%lu checks, %lu failed\n", checks, fails);
     return fails != 0;
 }
