@@ -19,6 +19,10 @@
  * Cheap when off: FACELOG_NOTE is a test of the log's pointer and one bit of its on mask, with no call. The
  * log is off until something turns it on (the FaceLog tool: FaceLog ON [calls], OFF, RESET, LIST [TO=file]).
  * When on, a note takes Forbid, finds the task's slot (the last one used first) and adds to a counter.
+ * A note is a leaf (Team 3, 13 Nov): it runs under LockLayerInfo and the layer's lock, so it takes no
+ * semaphore, calls no DOS or ramlib and never waits; only Forbid/Permit, FindTask and reads of the task.
+ * facelog_attach (FindSemaphore, AllocMem) belongs in a face's init, never under a lock.
+ * Each face keeps its ops and log pointer in its own library base, not in the ROM-core API.
  *
  * One block for the whole machine, shared by both faces and the tool: a public SignalSemaphore named
  * FACELOG_SHARED_NAME, with the log after it. It is made by the first to attach and never freed (about 7 KB).
