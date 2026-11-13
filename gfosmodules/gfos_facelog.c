@@ -396,7 +396,7 @@ FACELOG_FN void facelog_amiga_ops(struct facelog_ops *o, struct ExecBase *sysbas
 #ifdef FACELOG_TOOL
 #include <proto/dos.h>
 
-static const char facelog_version[] = "$VER: FaceLog 1.0 (13.11.2026)";
+static const char facelog_version[] __attribute__((used)) = "$VER: FaceLog 1.0 (13.11.2026)";
 
 int main(void)
 {
