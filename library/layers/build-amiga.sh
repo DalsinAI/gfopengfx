@@ -37,9 +37,9 @@ if [ "$COMP" = 0 ]; then CDEF=; else
   CDEF=-DOL_COMPOSITE
   LAYOUT=${LAYOUT:-"$HERE/../../../gfopenlayout"}
   if [ ! -f "$LAYOUT/library/layers/layers_comp.c" ]; then
-    LAYOUT="$OUT/gfopenlayout"
-    rm -rf "$LAYOUT"
-    git clone -q --depth 1 -b "${LAYOUT_BRANCH:-team3/layers-comp-move-20261113}" https://github.com/DalsinAI/gfopenlayout "$LAYOUT"
+    LTMP=$(mktemp -d); trap 'rm -rf "$LTMP"' EXIT
+    LAYOUT="$LTMP/gfopenlayout"
+    git clone -q --depth 1 -b "${LAYOUT_BRANCH:-master}" https://github.com/DalsinAI/gfopenlayout "$LAYOUT"
   fi
   [ -f "$LAYOUT/library/layers/layers_comp.c" ] || { echo "no layers_comp.c in LAYOUT=$LAYOUT" >&2; exit 1; }
   echo "layers_comp.c from $LAYOUT ($(git -C "$LAYOUT" rev-parse --short HEAD 2>/dev/null || echo no git))"
