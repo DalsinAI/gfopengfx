@@ -5,7 +5,7 @@
  * layers.library 47.101 and up (GFOpenLayers; OS 3.2's layers.library has
  * none of these: check lib_Version 47 and lib_Revision >= 101 first). The
  * calls follow OS 3.2's last LVO (SetLayerInfoBounds, -240). The design is
- * docs/design/compositing.md.
+ * GFOpenLayout's docs/design/compositing.md.
  *
  *  -246 LONG  ComposeLayerInfo(struct Layer_Info *li, struct BitMap *bm, ULONG flags)(a0,a1,d0)
  *  -252 LONG  SetLayerOpacity(struct Layer *layer, ULONG opacity)(a0,d0)

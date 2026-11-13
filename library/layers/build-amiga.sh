@@ -26,13 +26,28 @@ python3 "$GUEST/libraries/common/check_fd.py" "$FD" "$HERE/layers.lvo"
 LIBFLAGS="-m68040 $OPT -fno-strict-aliasing -fno-delete-null-pointer-checks -fomit-frame-pointer -fno-toplevel-reorder
   -fno-lto -fno-builtin -fno-tree-loop-distribute-patterns -Wall -Wextra -Werror
   -Wno-unused-parameter -nostartfiles -nostdlib"
-# OL_COMPOSITE: the composited mode (layers_comp.c, docs/design/compositing.md);
-# COMPOSITE=0 builds classic layers only, as before it
+# OL_COMPOSITE: the composited mode (layers_comp.c, docs/design/compositing.md),
+# which lives in GFOpenLayout since 13 Nov 2026 (wave 2, review rule 4) and is
+# taken from a checkout of it: LAYOUT=, else ../gfopenlayout beside this one,
+# else a shallow clone of its master (LAYOUT_BRANCH=). COMPOSITE=0 builds classic layers only,
+# as before it, and needs no GFOpenLayout.
 COMP=${COMPOSITE:-1}
-[ "$COMP" = 0 ] && CDEF= || CDEF=-DOL_COMPOSITE
+CINC=
+if [ "$COMP" = 0 ]; then CDEF=; else
+  CDEF=-DOL_COMPOSITE
+  LAYOUT=${LAYOUT:-"$HERE/../../../gfopenlayout"}
+  if [ ! -f "$LAYOUT/library/layers/layers_comp.c" ]; then
+    LTMP=$(mktemp -d); trap 'rm -rf "$LTMP"' EXIT
+    LAYOUT="$LTMP/gfopenlayout"
+    git clone -q --depth 1 -b "${LAYOUT_BRANCH:-master}" https://github.com/DalsinAI/gfopenlayout "$LAYOUT"
+  fi
+  [ -f "$LAYOUT/library/layers/layers_comp.c" ] || { echo "no layers_comp.c in LAYOUT=$LAYOUT" >&2; exit 1; }
+  echo "layers_comp.c from $LAYOUT ($(git -C "$LAYOUT" rev-parse --short HEAD 2>/dev/null || echo no git))"
+  CINC="-I$LAYOUT/library/layers"
+fi
 for name in layers gfopenlayers; do
   # shellcheck disable=SC2086
-  "$CC" $LIBFLAGS $CDEF -DLIBNAME="\"$name.library\"" -I"$HERE" -I"$HERE/../../include" -o "$OUT/libs/$name.library" \
+  "$CC" $LIBFLAGS $CDEF -DLIBNAME="\"$name.library\"" -I"$HERE" $CINC -I"$HERE/../../include" -o "$OUT/libs/$name.library" \
     "$HERE/openlayers_lib.c" "$HERE/layers_lib.c" "$HERE/layers_core.c" -lgcc
   echo "$OUT/libs/$name.library ($(wc -c < "$OUT/libs/$name.library") bytes)"
   und=$("$P/bin/m68k-amigaos-nm" -u "$OUT/libs/$name.library" || true)
