@@ -71,6 +71,8 @@
 #define LAYERS_WHY_CPU_ONLY     6       /* GFOpenGPU has no driver, only its CPU back end */
 #define LAYERS_WHY_NO_OPENGPU   7       /* gfopengpu.library or gfopenrtg.library would not open */
 #define LAYERS_WHY_NO_MEMORY    8       /* a layer's surface could not be had: it went back to classic layers */
+#define LAYERS_WHY_DIRECT       9       /* 47.109: screen direct mode, the default until "screen.mode composited" in
+                                         * ENV:GFOpenPrefs/Windows (GFOpenLayout docs/design/compositing.md) */
 
 #define LAYERLOOK_OPACITY       0UL     /* 0-255 */
 #define LAYERLOOK_SHADOW        1UL     /* a shadow under it (windows and menus: intuition sets it) */
