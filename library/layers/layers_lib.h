@@ -94,7 +94,7 @@ LONG ol_ShowLayer(struct ol_base *olb, struct Layer *l, struct Layer *in_front_o
 LONG ol_SetLayerInfoBounds(struct ol_base *olb, struct Layer_Info *li, const struct Rectangle *bounds);
 
 #ifdef OL_COMPOSITE
-/* The composited mode (docs/design/compositing.md, layers_comp.c): our own
+/* The composited mode (GFOpenLayout's docs/design/compositing.md and layers_comp.c): our own
  * calls after OS 3.2's last LVO, in include/graphics/gfopenlayers.h. */
 LONG ol_ComposeLayerInfo(struct ol_base *olb, struct Layer_Info *li, struct BitMap *bm, ULONG flags);
 LONG ol_SetLayerOpacity(struct ol_base *olb, struct Layer *l, ULONG opacity);
