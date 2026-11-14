@@ -32,3 +32,7 @@ echo "$OUT/tests/ScreenDepthProbe ($(wc -c < "$OUT/tests/ScreenDepthProbe") byte
 "$CC" $LATE -m68040 -specs="$TOP/build/m68k-soft-m68040.specs" -O2 -Wall -Wextra -Werror -Wno-pointer-sign -Wno-format -noixemul \
   -o "$OUT/tests/MonitorProbe" "$TOP/tests/MonitorProbe.c"
 echo "$OUT/tests/MonitorProbe ($(wc -c < "$OUT/tests/MonitorProbe") bytes)"
+# DriverCallLog: what a monitor driver asks of the display calls (its header says what it prints)
+"$CC" $LATE -m68040 -specs="$TOP/build/m68k-soft-m68040.specs" -O2 -Wall -Wextra -Werror -Wno-pointer-sign -Wno-format -noixemul \
+  -o "$OUT/tests/DriverCallLog" "$TOP/tests/DriverCallLog.c"
+echo "$OUT/tests/DriverCallLog ($(wc -c < "$OUT/tests/DriverCallLog") bytes)"

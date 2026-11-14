@@ -22,6 +22,7 @@ This directory is the display area of GFOpenGfx's `graphics.library` (see `libra
 | `build-amiga.sh` | Builds `DisplayABITest` with the os32-gcc16 stove. |
 | `tests/m68k/test_gfx_display.sh` | The qemu test (below). |
 | `tests/DisplayABITest.c` | One script run through OS 3.2's graphics.library and then through gfopengfx.library, compared line by line. `PROBE` prints OS 3.2's answers only. |
+| `tests/DriverCallLog.c` | Patches the display calls with SetFunction, runs a program (a monitor driver) and prints every call: registers, the memory they point at, the result. `build-amiga.sh` builds it. |
 | `tests/MonitorProbe.c` | On any ROM, after the monitor drivers have run: every MonitorSpec, every record of the database (MON= one monitor's, by ID), and one mode's screen with its copper list (ID=, FRONT). `build-amiga.sh` builds it. Its OS 3.2.3 output is in `tests/m68k/display_os323_*.txt`. |
 
 ## How a ViewPort becomes copper
@@ -67,6 +68,15 @@ These are as OS 3.2.3's drivers make them, measured with `tests/MonitorProbe.c` 
 - **Checked against OS 3.2.3.** For DblPAL High Res No Flicker and Low Res, Multiscan Productivity, DblNTSC High Res No Flicker, and PAL High Res laced and plain, MakeVPort sets OS 3.2.3's DIWSTRT, DIWSTOP, DIWHIGH, DDFSTRT, DDFSTOP, BPLCON1, both modulos, FMODE, BPLCON0 and BPLCON3.
 - **Known differences** from those lists. On PAL, OS 3.2.3's BPLCON0 has no ECSENA, its BPLCON3 asks for lores sprites (0x0C40) where ours leaves ECS's default, and its BPLCON2 has KILLEHB at any depth (ours only at 6 planes, where it matters).
 
+## Monitor drivers
+
+OS 3.2.3's drivers in `SYS:Storage/Monitors` were measured with `tests/DriverCallLog.c` (SetFunction, 8 November 2026). DblNTSC, DblPAL, Multiscan, Euro36, Euro72, Super72, NTSC and A2024 all call these:
+
+- **`GfxBase->DisplayInfoDataBase` is a tree.** A record (`gd_dbnode`, 56 bytes) has succ, pred, first child, parent, an ID, then TAG_MORE and its first data record. The root's children are monitors (ID: the monitor's ID >> 16), their children modes (ID: the display ID). A driver allocates its monitor's and modes' records and links them in itself, walking the tree to do so. Until 47.103 that field pointed at the array of IDs, so the walk ran through open bus for ever and the boot stopped. The built-in modes' records are there for the walk; they have no data, and the calls still work them out.
+- **A data record** is a QueryHeader (StructID, DisplayID, TAG_SKIP, Length), then Length 8-byte units, then `{TAG_MORE, next}` or `{0, 0}`. -744 (`a0` handle or 0, `a1` buffer, `d0` size, `d1` tag, `d2` ID when the handle is 0) adds a copy and answers `d0`. -750 (the same registers) changes one and answers the bytes written, or 20 fewer for a MonitorInfo. A monitor's modes share the one MonitorInfo that was added to any of them. A DimensionInfo's record holds Nominal, MaxOScan and VideoOScan as longwords in ticks; GetDisplayInfoData divides them by the mode's resolution (66 bytes), and the text and standard overscans are the nominal.
+- **A MonitorSpec's `xln_Init`.** GfxNew leaves a routine there and the driver calls it: `a0` the MonitorSpec, `d0` request flags (NTSC 1, PAL 2, SPECIAL 4, A2024 8), answering `d0`. It sets the flags and standard timing and, with SPECIAL, GfxNew's a SpecialMonitor. The driver overwrites most of the timing.
+- **FindDisplayInfo, NextDisplayInfo, GetDisplayInfoData, ModeNotAvailable and OpenMonitor** take a driver's records first, so its own values replace the tables above for its modes. NextDisplayInfo goes by ID, as before, not in the tree's order.
+
 ## Edge cases
 
 | Case | What we do | Source |
@@ -97,7 +107,7 @@ These are as OS 3.2.3's drivers make them, measured with `tests/MonitorProbe.c` 
 | GetSprite of a sprite that is taken, or -1 with none free | -1 | documented |
 | AllocSpriteDataA defaults | num -1, height from the bitmap, word width 1, posctldata 8-aligned in Chip RAM | ABI test (SPRDATA) |
 | GetExtSpriteA with old-format data and no OutputHeight | NULL: old data does not say how tall it is | ABI test |
-| GfxNew | xln_Library is GfxBase, xln_Init is 0 (OS 3.2 puts a routine there), a MonitorSpec's DisplayInfoDataBase is NewList'd | ABI test (GFXNEW) |
+| GfxNew | xln_Library is GfxBase; xln_Init is a MonitorSpec's routine (see "Monitor drivers"), 0 for the other types (OS 3.2 puts a routine there too); a MonitorSpec's DisplayInfoDataBase is NewList'd | ABI test (GFXNEW); DriverCallLog |
 | VideoControl with an unknown tag | Answers 1 and goes on | ABI test (VC unknown) |
 | NextDisplayInfo of an ID not in the database | The next ID above it | ABI test (NEXT unknown) |
 | ModeNotAvailable of an unknown monitor | DI_AVAIL_NOMONITOR | ABI test (NOTAVAIL) |
@@ -154,10 +164,12 @@ Result (m68k-linux-gnu-g++ 13.3.0, qemu-m68k 8.2.2, seed 20261013, 120 scenes, 3
 ## Not yet
 
 - A 16-pixel sprite's data shown while the width is 32 or 64 (another program's wide sprite) is read at that width: graphics.library does not convert it.
-- Euro72, Euro36, Super72 and A2024: their drivers' modes are not in the database (as with any other driver, until the AddDisplayInfo calls are done).
+- Euro72, Euro36, Super72 and A2024: their drivers' modes are in the database (see "Monitor drivers"), but OpenScreen, BestModeIDA and CoerceMode only know the built-in, Multiscan, DblNTSC and DblPAL monitors.
 - The test's machine shows 15 kHz frames only. The 31 kHz modes are checked against OS 3.2.3's registers, not pixel by pixel.
 - `do_monitor` is called as a C function with the MonitorSpec on the stack (`SpecialMonitor`'s declared type). OS 3.2.3's own call has not been seen.
-- Monitor drivers from DEVS:Monitors (the private AddDisplayInfo slots) and DTAG_VEC.
+- DTAG_VEC of the built-in modes.
+- -738: no OS 3.2.3 driver calls it, so what it does is unmeasured; it answers 0.
+- `xln_Init` of the other extended node types: OS 3.2 sets one in a SpecialMonitor too. Nothing has been seen to call it, and ours is NULL.
 - `gfx_hook_vsprites`: SprIns from gels' VSprites is still the stub.
 - copinit's wait14 is a NOOP, not a wait at line 10.
 - `DisplayABITest` has not yet been run against OS 3.2.

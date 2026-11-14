@@ -58,10 +58,18 @@ static int gd_is_system(const struct gfx_base *gb)
     return 1;
 }
 
+/* A MonitorSpec's xln_Init: a monitor driver calls it with the request flags
+ * in d0 (no A6: the library comes from the node) */
+static uint32_t gfx_monitor_init(GFX_REG(a0, struct gd_monitorspec *ms), GFX_REG(d0, uint32_t flags))
+{
+    return gd_monitor_init(gfx_env_of((struct gfx_base *)ms->n.library), ms, flags);
+}
+
 int gfx_init_display(struct gfx_env *env)
 {
     struct gfx_base *gb = env->base;
     if (!gd_init(env, gd_is_system(gb))) return 0;
+    gd_set_monitor_init(env, (void *)gfx_monitor_init);
     gb->vbsrv.node.type = 2;            /* NT_INTERRUPT */
     gb->vbsrv.node.pri = 10;
     gb->vbsrv.node.name = (char *)gd_vb_name;
@@ -184,6 +192,20 @@ struct gd_coplist *gfx_lvo_UCopperListInit(GFX_REG(a0, struct gd_ucoplist *ucl),
     GFX_REG(a6, struct gfx_base *gb))
 {
     return gd_UCopperListInit(ENV, ucl, (int16_t)n);
+}
+
+/* private -744: another data record for a driver's mode (AddDisplayInfoData) */
+uint32_t gfx_lvo_private_744(GFX_REG(a0, void *handle), GFX_REG(a1, const void *buf), GFX_REG(d0, uint32_t size),
+    GFX_REG(d1, uint32_t tagid), GFX_REG(d2, uint32_t id), GFX_REG(a6, struct gfx_base *gb))
+{
+    return gd_AddDisplayInfoData(ENV, handle, buf, size, tagid, id);
+}
+
+/* private -750: changes a driver's mode's data record (SetDisplayInfoData) */
+uint32_t gfx_lvo_private_750(GFX_REG(a0, void *handle), GFX_REG(a1, const void *buf), GFX_REG(d0, uint32_t size),
+    GFX_REG(d1, uint32_t tagid), GFX_REG(d2, uint32_t id), GFX_REG(a6, struct gfx_base *gb))
+{
+    return gd_SetDisplayInfoData(ENV, handle, buf, size, tagid, id);
 }
 
 struct gd_extnode *gfx_lvo_GfxNew(GFX_REG(d0, uint32_t type), GFX_REG(a6, struct gfx_base *gb))

@@ -26,6 +26,14 @@ extern "C" {
  * build only). */
 int gd_init(struct gfx_env *env, int own_hw);
 void gd_exit(struct gfx_env *env);
+/* The routine a MonitorSpec's xln_Init gets from GfxNew (register arguments,
+ * so the library's: display_lvo.c). Once, after gd_init. */
+void gd_set_monitor_init(struct gfx_env *env, void *routine);
+/* What that routine does: a monitor driver calls it with its request flags */
+uint32_t gd_monitor_init(struct gfx_env *env, struct gd_monitorspec *ms, uint32_t flags);
+/* graphics.library's private -744 and -750: data records of a driver's mode */
+uint32_t gd_AddDisplayInfoData(struct gfx_env *env, void *handle, const void *buf, uint32_t size, uint32_t tagid, uint32_t id);
+uint32_t gd_SetDisplayInfoData(struct gfx_env *env, void *handle, const void *buf, uint32_t size, uint32_t tagid, uint32_t id);
 /* The vertical blank's work, from the vbsrv interrupt server: the field's
  * copper list for an interlaced View, ChangeVPBitMap's messages, WaitTOF's
  * waiters, VBCounter. */
