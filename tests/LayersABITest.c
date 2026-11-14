@@ -26,7 +26,9 @@
  * Before the rounds, one fixed case (row 12): three overlapping simple
  * layers, then a drag (MoveLayer) and a depth change (BehindLayer). A
  * walker counts gaps, overlaps and ClipRect pixels outside each layer's
- * on-screen rectangle. OS 3.2 and ours must print the same T lines.
+ * on-screen rectangle. The counts are informational: OS 3.2's simple
+ * layers leave obscured pixels with no ClipRect, so a gap is not a
+ * pass or a fail. Both libraries must still print the same T lines.
  *
  *   LayersABITest [PROBE] [ROUNDS=n] [LIB=dir]
  * Exit 0 when nothing differs, 5 when something does, 20 on an error. */
@@ -541,11 +543,11 @@ static void tile_all(const char *what)
 {
     int i, gaps = 0, over = 0, outn = 0;
     for (i = 0; i < nlay; i++) if (!hid[i]) tile_layer(lay[i], &gaps, &over, &outn);
-    out("T %s gaps=%d over=%d out=%d %s\n", what, gaps, over, outn, (gaps || over || outn) ? "FAIL" : "ok");
+    out("T %s gaps=%d over=%d out=%d\n", what, gaps, over, outn);
 }
 
 /* Three overlapping simple layers, then a drag and a depth change.
- * The T lines are the case: they fail the compare when ours does not tile. */
+ * The T lines carry the counts. They are not a verdict. */
 static void cliprect_walk(void)
 {
     struct Layer *a, *b, *c;
