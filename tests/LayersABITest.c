@@ -336,6 +336,8 @@ static void delete_layer(int step, int i)
     if (sup[i]) { WaitBlit(); FreeBitMap(sup[i]); }
     for (k = i; k + 1 < nlay; k++) { lay[k] = lay[k + 1]; sup[k] = sup[k + 1]; hid[k] = hid[k + 1]; }
     nlay--;
+    lay[nlay] = 0;
+    sup[nlay] = 0;
     if (step >= 0) report(step, "delete", r);
 }
 
@@ -564,6 +566,7 @@ static void cliprect_walk(void)
     }
     lay[0] = a; lay[1] = b; lay[2] = c; nlay = 3;
     hid[0] = hid[1] = hid[2] = 0;
+    sup[0] = sup[1] = sup[2] = 0;
     tile_all("made");
     MoveLayer(0, b, 20, 10);
     tile_all("drag");
