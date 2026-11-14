@@ -23,6 +23,13 @@
  * and whether it has a bitmap), of its DamageList, of every pixel
  * ReadPixel reads through it, and of the whole bitmap.
  *
+ * Before the rounds, one fixed case (row 12): three overlapping simple
+ * layers, then a drag (MoveLayer) and a depth change (BehindLayer). A
+ * walker counts gaps, overlaps and ClipRect pixels outside each layer's
+ * on-screen rectangle. The counts are informational: OS 3.2's simple
+ * layers leave obscured pixels with no ClipRect, so a gap is not a
+ * pass or a fail. Both libraries must still print the same T lines.
+ *
  *   LayersABITest [PROBE] [ROUNDS=n] [LIB=dir]
  * Exit 0 when nothing differs, 5 when something does, 20 on an error. */
 #include <exec/types.h>
@@ -331,6 +338,8 @@ static void delete_layer(int step, int i)
     if (sup[i]) { WaitBlit(); FreeBitMap(sup[i]); }
     for (k = i; k + 1 < nlay; k++) { lay[k] = lay[k + 1]; sup[k] = sup[k + 1]; hid[k] = hid[k + 1]; }
     nlay--;
+    lay[nlay] = 0;
+    sup[nlay] = 0;
     if (step >= 0) report(step, "delete", r);
 }
 
@@ -506,10 +515,75 @@ static void one_round(int round)
     flush_calls();
 }
 
+/* ClipRects tile the layer's on-screen rectangle: every pixel in exactly
+ * one, none outside it. gaps, over and out are counted, not repaired. */
+static void tile_layer(struct Layer *l, int *gaps, int *over, int *outn)
+{
+    struct ClipRect *cr;
+    LONG x, y, x0 = l->bounds.MinX, y0 = l->bounds.MinY, x1 = l->bounds.MaxX, y1 = l->bounds.MaxY;
+    if (x0 < 0) x0 = 0;
+    if (y0 < 0) y0 = 0;
+    if (x1 > BW - 1) x1 = BW - 1;
+    if (y1 > BH - 1) y1 = BH - 1;
+    for (y = 0; y < BH; y++) for (x = 0; x < BW; x++) map[y][x] = 0;
+    for (cr = l->ClipRect; cr; cr = cr->Next)
+        for (y = cr->bounds.MinY; y <= cr->bounds.MaxY; y++)
+            for (x = cr->bounds.MinX; x <= cr->bounds.MaxX; x++) {
+                if (x < x0 || y < y0 || x > x1 || y > y1 || x < 0 || y < 0 || x >= BW || y >= BH) { (*outn)++; continue; }
+                if (map[y][x]) (*over)++;
+                map[y][x] = 1;
+            }
+    if (x1 < x0 || y1 < y0) return;
+    for (y = y0; y <= y1; y++)
+        for (x = x0; x <= x1; x++)
+            if (!map[y][x]) (*gaps)++;
+}
+
+static void tile_all(const char *what)
+{
+    int i, gaps = 0, over = 0, outn = 0;
+    for (i = 0; i < nlay; i++) if (!hid[i]) tile_layer(lay[i], &gaps, &over, &outn);
+    out("T %s gaps=%d over=%d out=%d\n", what, gaps, over, outn);
+}
+
+/* Three overlapping simple layers, then a drag and a depth change.
+ * The T lines carry the counts. They are not a verdict. */
+static void cliprect_walk(void)
+{
+    struct Layer *a, *b, *c;
+    nlay = 0;
+    fill_bitmap(screen, 1);
+    if (!(li = NewLayerInfo())) { out("T no Layer_Info\n"); return; }
+    a = CreateBehindHookLayer(li, screen, 10, 10, 100, 80, LAYERSIMPLE, LAYERS_NOBACKFILL, 0);
+    b = CreateUpfrontHookLayer(li, screen, 40, 30, 140, 120, LAYERSIMPLE, LAYERS_NOBACKFILL, 0);
+    c = CreateUpfrontHookLayer(li, screen, 70, 50, 180, 150, LAYERSIMPLE, LAYERS_NOBACKFILL, 0);
+    if (!a || !b || !c) {
+        out("T create failed\n");
+        if (c) DeleteLayer(0, c);
+        if (b) DeleteLayer(0, b);
+        if (a) DeleteLayer(0, a);
+        DisposeLayerInfo(li);
+        li = 0;
+        return;
+    }
+    lay[0] = a; lay[1] = b; lay[2] = c; nlay = 3;
+    hid[0] = hid[1] = hid[2] = 0;
+    sup[0] = sup[1] = sup[2] = 0;
+    tile_all("made");
+    MoveLayer(0, b, 20, 10);
+    tile_all("drag");
+    BehindLayer(0, c);
+    tile_all("depth");
+    while (nlay) delete_layer(-1, 0);
+    DisposeLayerInfo(li);
+    li = 0;
+}
+
 static void run(int rounds)
 {
     int r;
     out_len = 0;
+    cliprect_walk();
     for (r = 0; r < rounds; r++) one_round(r);
 }
 
