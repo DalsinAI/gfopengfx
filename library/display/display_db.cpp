@@ -297,6 +297,7 @@ gd_queryheader *db_record_shared(gd_dbnode *n, uint32_t tagid)
  * are the nominal (OS 3.2.3, MonitorProbe) */
 uint32_t db_dims(gd_dbnode *n, const gd_queryheader *h, gd_dimensioninfo &out)
 {
+    if (h->length < 8) return 0;        /* the fields below are 58 bytes: a shorter record has not them */
     const gd_queryheader *dh = db_record(n, GD_DTAG_DISP);
     const int rx = dh ? reinterpret_cast<const gd_displayinfo *>(dh)->resolution.x : 1;
     const int ry = dh ? reinterpret_cast<const gd_displayinfo *>(dh)->resolution.y : 1;
@@ -1041,7 +1042,8 @@ uint32_t gd_AddDisplayInfoData(gfx_env *env, void *handle, const void *buf, uint
 }
 
 /* -750: the driver changes a record, a monitor's shared MonitorInfo too
- * (which it writes whole, Mspc and all, yet OS 3.2.3 answers 20 fewer) */
+ * (which it writes whole, Mspc and all, yet OS 3.2.3 answers 20 fewer);
+ * the record keeps the QueryHeader -744 stored */
 uint32_t gd_SetDisplayInfoData(gfx_env *env, void *handle, const void *buf, uint32_t size, uint32_t tagid, uint32_t id)
 {
     gd_dbnode *n = db_target(env, handle, id);
@@ -1050,7 +1052,11 @@ uint32_t gd_SetDisplayInfoData(gfx_env *env, void *handle, const void *buf, uint
     if (!h) return 0;
     const uint32_t len = rec_len(h);
     if (size > len) size = len;
-    copy_out(h, buf, size);
+    /* the stored QueryHeader stays: its Length says where the record's
+     * {TAG_MORE, next} is and how much gd_exit frees, whatever buf's says */
+    if (size > sizeof *h)
+        copy_out(reinterpret_cast<uint8_t *>(h) + sizeof *h, static_cast<const uint8_t *>(buf) + sizeof *h,
+                 size - sizeof *h);
     return tagid == GD_DTAG_MNTR && size > 20 ? size - 20 : size;
 }
 

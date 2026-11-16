@@ -1459,6 +1459,26 @@ static void driver_records()
           && dm.maxoscan.maxx == 679 && dm.maxoscan.maxy == 265 && dm.videooscan.minx == -104
           && dm.stdoscan.maxx == 639 && dm.txtoscan.maxy == 255, "DTAG_DIMS divides the ticks by the resolution");
     CHECK(gd_SetDisplayInfoData(&E, h, &mg, 0x58, GD_DTAG_NAME, 0) == 0, "-750 of a record it has not");
+    /* -750 with a buffer whose QueryHeader says more: the stored one stays,
+     * so the walk to the next record and gd_exit's free still fit */
+    gd_displayinfo big;
+    memset(&big, 0, sizeof big);
+    big.header = { GD_DTAG_DISP, a.id, GFX_TAG_SKIP, 40 };
+    big.notavailable = 0x55;
+    CHECK(gd_SetDisplayInfoData(&E, h, &big, 0x30, GD_DTAG_DISP, 0) == 0x30, "-750 of a buffer with a longer Length");
+    memset(&got, 0, sizeof got);
+    CHECK(gd_GetDisplayInfoData(&E, h, &got, 0x38, GD_DTAG_DISP, 0) == 0x30 && got.header.length == 4
+          && got.notavailable == 0x55, "the record keeps its Length, its fields change");
+    memset(&mi, 0, sizeof mi);
+    CHECK(gd_GetDisplayInfoData(&E, h, &mi, 0x60, GD_DTAG_MNTR, 0) == 0x58 && mi.totalrows == 600,
+          "the record after it is still found");
+    /* a DimensionInfo too short for its fields answers nothing */
+    static const uint8_t shortdims[32] = { 0x80, 0x00, 0x10, 0x00, 0x00, 0x0B, 0x10, 0x00, 0, 0, 0, 3, 0, 0, 0, 2,
+                                           0, 8 };
+    CHECK(gd_AddDisplayInfoData(&E, &a, shortdims, 32, GD_DTAG_DIMS, GD_INVALID_ID) == 32, "-744 of a short DimensionInfo");
+    memset(&dm, 0, sizeof dm);
+    CHECK(gd_GetDisplayInfoData(&E, h, &dm, sizeof dm, GD_DTAG_DIMS, 0) == 0 && dm.maxdepth == 0,
+          "a DimensionInfo shorter than its fields is not read past");
     gd_GfxFree(&E, &ms->n);
 
     /* xln_Init: what a driver asks of a new MonitorSpec */
