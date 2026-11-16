@@ -42,16 +42,16 @@
 #define LIBNAME "graphics.library"
 #endif
 #define LIB_VERSION  47
-#define LIB_REVISION 102                /* 47.100 and up: GFOpenGfx; 47.101: the drawing dispatch (gfx_dispatch.c); 47.102: its provider chain */
+#define LIB_REVISION 103                /* 47.100 and up: GFOpenGfx; 47.101: the drawing dispatch (gfx_dispatch.c); 47.102: its provider chain; 47.103: monitor drivers (the database's tree, -744, -750, xln_Init) */
 
 /* Run as a program, the library does nothing. This must stay the first code
  * in the file (-fno-toplevel-reorder). */
 int start(void) { return -1; }
 
 static const char lib_name[] = LIBNAME;
-static const char lib_id[] = "graphics.library 47.102 (02.11.2026) GFOpenGfx, AmiCradle Team\r\n";
+static const char lib_id[] = "graphics.library 47.103 (08.11.2026) GFOpenGfx, AmiCradle Team\r\n";
 static const char lib_ver[] __attribute__((used)) =
-    "\0$VER: graphics.library 47.102 (02.11.2026) GFOpenGfx, AmiCradle Team";
+    "\0$VER: graphics.library 47.103 (08.11.2026) GFOpenGfx, AmiCradle Team";
 static const char util_name[] = "utility.library";
 
 /* ---- the env: ctx is the library base -------------------------------- */

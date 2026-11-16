@@ -143,8 +143,8 @@ GFOpenGfx's graphics.library is four areas built into one library: gfx-face (`li
 | -726 | FindDisplayInfo | d0 | gfx-display | `gfx_lvo_FindDisplayInfo` |
 | -732 | NextDisplayInfo | d0 | gfx-display | `gfx_lvo_NextDisplayInfo` |
 | -738 | private | - | gfx-face | `gfx_lvo_private_738` |
-| -744 | private | - | gfx-face | `gfx_lvo_private_744` |
-| -750 | private | - | gfx-face | `gfx_lvo_private_750` |
+| -744 | private | a0 a1 d0 d1 d2 | gfx-display | `gfx_lvo_private_744` |
+| -750 | private | a0 a1 d0 d1 d2 | gfx-display | `gfx_lvo_private_750` |
 | -756 | GetDisplayInfoData | a0 a1 d0 d1 d2 | gfx-display | `gfx_lvo_GetDisplayInfoData` |
 | -762 | FontExtent | a0 a1 | gfx-text | `gfx_lvo_FontExtent` |
 | -768 | ReadPixelLine8 | a0 d0 d1 d2 a2 a1 | gfx-face | `gfx_lvo_ReadPixelLine8` |

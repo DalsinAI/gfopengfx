@@ -122,8 +122,8 @@
 -726 FindDisplayInfo d0
 -732 NextDisplayInfo d0
 -738 private
--744 private
--750 private
+-744 private a0,a1,d0,d1,d2
+-750 private a0,a1,d0,d1,d2
 -756 GetDisplayInfoData a0,a1,d0,d1,d2
 -762 FontExtent a0,a1
 -768 ReadPixelLine8 a0,d0,d1,d2,a2,a1
