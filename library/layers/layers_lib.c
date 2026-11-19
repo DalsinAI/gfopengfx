@@ -108,6 +108,7 @@ struct OLayer {
     UBYTE look;                 /* OLOOK_ bits (layers_comp.c) */
     UBYTE grown;
     struct lc_rect dirty;       /* drawn since the last compose, from the layer's top left; x0 > x1 for none */
+    struct OOverlay *ovl;       /* 47.111: its overlay (GFOpenLayout Overlay, layers_comp.c); 0 for none */
 #endif
 };
 

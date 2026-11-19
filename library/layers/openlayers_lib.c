@@ -38,7 +38,7 @@
 #define LIBNAME "layers.library"
 #endif
 #define LIB_VERSION  47
-#define LIB_REVISION 109                /* 47.100 and up: GFOpenLayers; 47.101: the composited mode; 47.102: LAYERS_COMPOSE_WHY; 47.103: surfaces in video RAM; 47.104: surfaces in the card part; 47.105: composes not waited for; 47.106: what programs write into the screen goes into their windows; 47.107: LAYERLOOK_KEYED (the screen's see-through bar); 47.108: Draw, PolyDraw, DrawEllipse, ClearEOL, ClearScreen, WritePixelLine8 and ScalePixelArray compose only what they drew; 47.109: screen direct mode is the default (screen.mode composited asks for the compositor) */
+#define LIB_REVISION 111                /* 47.100 and up: GFOpenLayers; 47.101: the composited mode; 47.102: LAYERS_COMPOSE_WHY; 47.103: surfaces in video RAM; 47.104: surfaces in the card part; 47.105: composes not waited for; 47.106: what programs write into the screen goes into their windows; 47.107: LAYERLOOK_KEYED (the screen's see-through bar); 47.108: Draw, PolyDraw, DrawEllipse, ClearEOL, ClearScreen, WritePixelLine8 and ScalePixelArray compose only what they drew; 47.109: screen direct mode is the default (screen.mode composited asks for the compositor); 47.111: GFOpenLayout Overlay */
 
 /* Everything the library keeps is here (or on the stack): no writable
  * globals, so it can run from ROM. Each call reaches it through A6. */
@@ -53,9 +53,9 @@ struct OLBase {
 int start(void) { return -1; }
 
 static const char lib_name[] = LIBNAME;
-static const char lib_id[] = "layers.library 47.109 (13.11.2026) GFOpenLayers, AmiCradle Team\r\n";
+static const char lib_id[] = "layers.library 47.111 (19.11.2026) GFOpenLayers, AmiCradle Team\r\n";
 static const char lib_ver[] __attribute__((used)) =
-    "\0$VER: layers.library 47.109 (13.11.2026) GFOpenLayers, AmiCradle Team";
+    "\0$VER: layers.library 47.111 (19.11.2026) GFOpenLayers, AmiCradle Team";
 static const char gfx_name[] = "graphics.library";
 
 /* A hook as utility.library calls one: A0 the hook, A2 the object, A1 the
@@ -287,6 +287,32 @@ static ULONG L_SetLayerLook(REG(a0, struct Layer *l), REG(d0, ULONG what), REG(d
 {
     return ol_SetLayerLook(&base->ol, l, what, value);
 }
+
+/* 47.111: GFOpenLayout Overlay */
+static struct OOverlay *L_OpenOverlay(REG(a0, struct Layer *l), REG(a1, const struct TagItem *tags), OB)
+{
+    return ol_OpenOverlay(&base->ol, l, tags);
+}
+
+static LONG L_OverlayInfo(REG(a0, struct OOverlay *ov), REG(a1, struct LayerOverlayInfo *info), OB)
+{
+    return ol_OverlayInfo(&base->ol, ov, info);
+}
+
+static void L_DamageOverlay(REG(a0, struct OOverlay *ov), REG(a1, const struct Rectangle *r), OB)
+{
+    ol_DamageOverlay(&base->ol, ov, r);
+}
+
+static LONG L_SetOverlayAttrs(REG(a0, struct OOverlay *ov), REG(a1, const struct TagItem *tags), OB)
+{
+    return ol_SetOverlayAttrs(&base->ol, ov, tags);
+}
+
+static void L_CloseOverlay(REG(a0, struct OOverlay *ov), OB)
+{
+    ol_CloseOverlay(&base->ol, ov);
+}
 #endif
 
 #undef OB
@@ -334,6 +360,11 @@ static const APTR lib_vectors[] = {
     (APTR)L_ComposeLayerInfo,           /* -246, ours */
     (APTR)L_SetLayerOpacity,            /* -252, ours */
     (APTR)L_SetLayerLook,               /* -258, ours */
+    (APTR)L_OpenOverlay,                /* -264, ours: 47.111, GFOpenLayout Overlay */
+    (APTR)L_OverlayInfo,                /* -270 */
+    (APTR)L_DamageOverlay,              /* -276 */
+    (APTR)L_SetOverlayAttrs,            /* -282 */
+    (APTR)L_CloseOverlay,               /* -288 */
 #endif
     (APTR)-1
 };

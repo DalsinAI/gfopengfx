@@ -10,6 +10,12 @@
  *  -246 LONG  ComposeLayerInfo(struct Layer_Info *li, struct BitMap *bm, ULONG flags)(a0,a1,d0)
  *  -252 LONG  SetLayerOpacity(struct Layer *layer, ULONG opacity)(a0,d0)
  *  -258 ULONG SetLayerLook(struct Layer *layer, ULONG what, ULONG value)(a0,d0,d1)
+ *  47.111, GFOpenLayout Overlay (GFOpenLayout docs/design/overlay.md):
+ *  -264 APTR  OpenOverlay(struct Layer *layer, struct TagItem *tags)(a0,a1)
+ *  -270 LONG  OverlayInfo(APTR overlay, struct LayerOverlayInfo *info)(a0,a1)
+ *  -276 VOID  DamageOverlay(APTR overlay, struct Rectangle *rect)(a0,a1)
+ *  -282 LONG  SetOverlayAttrs(APTR overlay, struct TagItem *tags)(a0,a1)
+ *  -288 VOID  CloseOverlay(APTR overlay)(a0)
  *
  * ComposeLayerInfo switches a Layer_Info with no layers yet to the
  * composited mode (LAYERS_COMPOSE_ON), for layers on the bitmap bm. It
@@ -91,5 +97,38 @@
 #define LVO_ComposeLayerInfo    (-246)
 #define LVO_SetLayerOpacity     (-252)
 #define LVO_SetLayerLook        (-258)
+
+/* 47.111: GFOpenLayout Overlay. A box in a layer whose pixels come from outside graphics.library (the host,
+ * GL, a video decoder): the producer writes pictures into the overlay's own surface, at the picture's size;
+ * the compositor puts them in the box, scaled, cut to what shows. On a layer that is not composited (screen
+ * direct mode, a custom or 8-bit screen, AGA) OverlayInfo answers LAYERS_OVERLAY_CLASSIC and the producer
+ * draws the picture into the layer itself (WritePixelArray, ScalePixelArray). Close it before its layer goes. */
+#define OPENLAYERS_OVERLAY_REVISION 111
+
+#define OVA_Dummy       (0x80000000UL + 0x4F560000UL)   /* 'OV' */
+#define OVA_Left        (OVA_Dummy + 1)     /* the box in the layer, from its top left (default 0) */
+#define OVA_Top         (OVA_Dummy + 2)
+#define OVA_Width       (OVA_Dummy + 3)     /* (default: the layer's width less OVA_Left) */
+#define OVA_Height      (OVA_Dummy + 4)
+#define OVA_PicWidth    (OVA_Dummy + 5)     /* the picture's size (default the box's): scaled to the box */
+#define OVA_PicHeight   (OVA_Dummy + 6)
+
+#define LAYERS_OVERLAY_CLASSIC  0   /* OverlayInfo: no surface; draw into the layer */
+#define LAYERS_OVERLAY_SURFACE  1   /* OverlayInfo: write the picture at memory, bytes_per_row apart */
+
+struct LayerOverlayInfo {
+    ULONG kind;             /* LAYERS_OVERLAY_ */
+    APTR memory;            /* the picture's pixel 0,0 (SURFACE) */
+    ULONG bytes_per_row;
+    UWORD width, height;    /* the picture's */
+    ULONG format;           /* GFOpenRTG's: 1 RGB565, 2 ARGB32 */
+    struct Rectangle box;   /* the box, in the layer */
+};
+
+#define LVO_OpenOverlay         (-264)
+#define LVO_OverlayInfo         (-270)
+#define LVO_DamageOverlay       (-276)
+#define LVO_SetOverlayAttrs     (-282)
+#define LVO_CloseOverlay        (-288)
 
 #endif
