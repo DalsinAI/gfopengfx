@@ -99,6 +99,14 @@ LONG ol_SetLayerInfoBounds(struct ol_base *olb, struct Layer_Info *li, const str
 LONG ol_ComposeLayerInfo(struct ol_base *olb, struct Layer_Info *li, struct BitMap *bm, ULONG flags);
 LONG ol_SetLayerOpacity(struct ol_base *olb, struct Layer *l, ULONG opacity);
 ULONG ol_SetLayerLook(struct ol_base *olb, struct Layer *l, ULONG what, ULONG value);
+/* 47.111: GFOpenLayout Overlay (include/graphics/gfopenlayers.h) */
+struct OOverlay;
+struct TagItem;
+struct LayerOverlayPlace;
+struct OOverlay *ol_OpenOverlay(struct ol_base *olb, struct Layer *l, const struct TagItem *tags);
+struct LayerOverlayPlace *ol_OverlayPlace(struct ol_base *olb, struct OOverlay *ov);
+LONG ol_SetOverlayAttrs(struct ol_base *olb, struct OOverlay *ov, const struct TagItem *tags);
+void ol_CloseOverlay(struct ol_base *olb, struct OOverlay *ov);
 #endif
 
 #endif

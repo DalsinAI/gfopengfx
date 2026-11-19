@@ -108,6 +108,7 @@ struct OLayer {
     UBYTE look;                 /* OLOOK_ bits (layers_comp.c) */
     UBYTE grown;
     struct lc_rect dirty;       /* drawn since the last compose, from the layer's top left; x0 > x1 for none */
+    struct OOverlay *ovl;       /* 47.111: its overlay (GFOpenLayout Overlay, layers_comp.c); 0 for none */
 #endif
 };
 
@@ -132,6 +133,7 @@ static int oc_finish(struct change *ch, struct Layer *made, struct Layer *gone);
 static void oc_touch(struct ol_base *olb, struct Layer *l, const struct lc_rect *r);
 static void oc_demoted(struct change *ch, int ok);
 static void oc_gone(struct ol_base *olb, struct Layer *l);
+static void oc_places(struct ol_base *olb, struct Layer_Info *li);
 static void oc_info_drop(struct ol_base *olb, struct OInfo *i);
 static void oc_lock(struct ol_base *olb, int on);
 struct OCB;
@@ -1025,6 +1027,7 @@ static int finish(struct change *ch, struct Layer *made, struct Layer *gone)
     free_stack(st, ord, n);
 #ifdef OL_COMPOSITE
     if (ch->demoted) oc_demoted(ch, 1);
+    oc_places(olb, ch->li);     /* 47.111: the overlays' new places (classic layers) */
 #endif
     end(ch);
     return 0;

@@ -41,3 +41,7 @@
 -246 ComposeLayerInfo a0,a1,d0  # ours, beyond the fd: the composited mode (include/graphics/gfopenlayers.h)
 -252 SetLayerOpacity a0,d0  # ours, beyond the fd
 -258 SetLayerLook a0,d0,d1  # ours, beyond the fd
+-264 OpenOverlay a0,a1  # ours, beyond the fd: 47.111, GFOpenLayout Overlay
+-270 OverlayPlace a0  # ours, beyond the fd
+-276 SetOverlayAttrs a0,a1  # ours, beyond the fd
+-282 CloseOverlay a0  # ours, beyond the fd
