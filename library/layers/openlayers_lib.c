@@ -294,14 +294,9 @@ static struct OOverlay *L_OpenOverlay(REG(a0, struct Layer *l), REG(a1, const st
     return ol_OpenOverlay(&base->ol, l, tags);
 }
 
-static LONG L_OverlayInfo(REG(a0, struct OOverlay *ov), REG(a1, struct LayerOverlayInfo *info), OB)
+static struct LayerOverlayPlace *L_OverlayPlace(REG(a0, struct OOverlay *ov), OB)
 {
-    return ol_OverlayInfo(&base->ol, ov, info);
-}
-
-static void L_DamageOverlay(REG(a0, struct OOverlay *ov), REG(a1, const struct Rectangle *r), OB)
-{
-    ol_DamageOverlay(&base->ol, ov, r);
+    return ol_OverlayPlace(&base->ol, ov);
 }
 
 static LONG L_SetOverlayAttrs(REG(a0, struct OOverlay *ov), REG(a1, const struct TagItem *tags), OB)
@@ -361,10 +356,9 @@ static const APTR lib_vectors[] = {
     (APTR)L_SetLayerOpacity,            /* -252, ours */
     (APTR)L_SetLayerLook,               /* -258, ours */
     (APTR)L_OpenOverlay,                /* -264, ours: 47.111, GFOpenLayout Overlay */
-    (APTR)L_OverlayInfo,                /* -270 */
-    (APTR)L_DamageOverlay,              /* -276 */
-    (APTR)L_SetOverlayAttrs,            /* -282 */
-    (APTR)L_CloseOverlay,               /* -288 */
+    (APTR)L_OverlayPlace,               /* -270 */
+    (APTR)L_SetOverlayAttrs,            /* -276 */
+    (APTR)L_CloseOverlay,               /* -282 */
 #endif
     (APTR)-1
 };

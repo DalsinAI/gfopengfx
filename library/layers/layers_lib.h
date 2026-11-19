@@ -102,11 +102,9 @@ ULONG ol_SetLayerLook(struct ol_base *olb, struct Layer *l, ULONG what, ULONG va
 /* 47.111: GFOpenLayout Overlay (include/graphics/gfopenlayers.h) */
 struct OOverlay;
 struct TagItem;
-struct LayerOverlayInfo;
-struct Rectangle;
+struct LayerOverlayPlace;
 struct OOverlay *ol_OpenOverlay(struct ol_base *olb, struct Layer *l, const struct TagItem *tags);
-LONG ol_OverlayInfo(struct ol_base *olb, struct OOverlay *ov, struct LayerOverlayInfo *info);
-void ol_DamageOverlay(struct ol_base *olb, struct OOverlay *ov, const struct Rectangle *r);
+struct LayerOverlayPlace *ol_OverlayPlace(struct ol_base *olb, struct OOverlay *ov);
 LONG ol_SetOverlayAttrs(struct ol_base *olb, struct OOverlay *ov, const struct TagItem *tags);
 void ol_CloseOverlay(struct ol_base *olb, struct OOverlay *ov);
 #endif

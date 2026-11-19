@@ -12,10 +12,9 @@
  *  -258 ULONG SetLayerLook(struct Layer *layer, ULONG what, ULONG value)(a0,d0,d1)
  *  47.111, GFOpenLayout Overlay (GFOpenLayout docs/design/overlay.md):
  *  -264 APTR  OpenOverlay(struct Layer *layer, struct TagItem *tags)(a0,a1)
- *  -270 LONG  OverlayInfo(APTR overlay, struct LayerOverlayInfo *info)(a0,a1)
- *  -276 VOID  DamageOverlay(APTR overlay, struct Rectangle *rect)(a0,a1)
- *  -282 LONG  SetOverlayAttrs(APTR overlay, struct TagItem *tags)(a0,a1)
- *  -288 VOID  CloseOverlay(APTR overlay)(a0)
+ *  -270 struct LayerOverlayPlace *OverlayPlace(APTR overlay)(a0)
+ *  -276 LONG  SetOverlayAttrs(APTR overlay, struct TagItem *tags)(a0,a1)
+ *  -282 VOID  CloseOverlay(APTR overlay)(a0)
  *
  * ComposeLayerInfo switches a Layer_Info with no layers yet to the
  * composited mode (LAYERS_COMPOSE_ON), for layers on the bitmap bm. It
@@ -98,11 +97,12 @@
 #define LVO_SetLayerOpacity     (-252)
 #define LVO_SetLayerLook        (-258)
 
-/* 47.111: GFOpenLayout Overlay. A box in a layer whose pixels come from outside graphics.library (the host,
- * GL, a video decoder): the producer writes pictures into the overlay's own surface, at the picture's size;
- * the compositor puts them in the box, scaled, cut to what shows. On a layer that is not composited (screen
- * direct mode, a custom or 8-bit screen, AGA) OverlayInfo answers LAYERS_OVERLAY_CLASSIC and the producer
- * draws the picture into the layer itself (WritePixelArray, ScalePixelArray). Close it before its layer goes. */
+/* 47.111: GFOpenLayout Overlay. A box in a layer whose pixels the host writes straight into the screen (a guest
+ * core's frames, GL, video), scaled by the GPU or AkikoPlus. Whatever makes the pictures never sees the window:
+ * the compositor keeps a place record up to date (where the box is on the screen, what of it shows, the
+ * screen's memory and format) and never draws the box itself; whoever writes the pictures reads the record
+ * before each one. Moving, sizing (full screen is a window the size of the screen), covering and
+ * uncovering the window change only the record. Close it before its layer goes, after the writer has stopped. */
 #define OPENLAYERS_OVERLAY_REVISION 111
 
 #define OVA_Dummy       (0x80000000UL + 0x4F560000UL)   /* 'OV' */
@@ -110,25 +110,37 @@
 #define OVA_Top         (OVA_Dummy + 2)
 #define OVA_Width       (OVA_Dummy + 3)     /* (default: the layer's width less OVA_Left) */
 #define OVA_Height      (OVA_Dummy + 4)
-#define OVA_PicWidth    (OVA_Dummy + 5)     /* the picture's size (default the box's): scaled to the box */
+#define OVA_PicWidth    (OVA_Dummy + 5)     /* the picture's size, for the writer (0: not said) */
 #define OVA_PicHeight   (OVA_Dummy + 6)
 
-#define LAYERS_OVERLAY_CLASSIC  0   /* OverlayInfo: no surface; draw into the layer */
-#define LAYERS_OVERLAY_SURFACE  1   /* OverlayInfo: write the picture at memory, bytes_per_row apart */
+#define OVP_MAGIC       0x4F56504CUL        /* 'OVPL' */
+#define OVP_VERSION     1
+#define OVP_MAXRECTS    32
 
-struct LayerOverlayInfo {
-    ULONG kind;             /* LAYERS_OVERLAY_ */
-    APTR memory;            /* the picture's pixel 0,0 (SURFACE) */
+#define OVPF_SHOWN      1UL     /* something of the box shows: write into rects */
+#define OVPF_COMPOSITED 2UL     /* the screen is composited (a hole is left in the layer for the box) */
+#define OVPF_TOOMANY    4UL     /* more pieces show than rects holds: the first OVP_MAXRECTS are there */
+
+/* The place record (big-endian, in public memory, at the same address while the overlay is open). Read it as
+ * a seqlock: seq even, then the record, then seq again the same; else read it again. All on the screen. */
+struct LayerOverlayPlace {
+    ULONG magic;                /* OVP_MAGIC */
+    UWORD version, pad;         /* OVP_VERSION */
+    volatile ULONG seq;         /* odd while it is being written */
+    ULONG flags;                /* OVPF_ */
+    APTR screen;                /* the screen's pixel 0,0 */
     ULONG bytes_per_row;
-    UWORD width, height;    /* the picture's */
-    ULONG format;           /* GFOpenRTG's: 1 RGB565, 2 ARGB32 */
-    struct Rectangle box;   /* the box, in the layer */
+    UWORD screen_width, screen_height;
+    ULONG format;               /* GFOpenRTG's: 1 RGB565, 2 ARGB32; 0: the host can't write this screen (AGA) */
+    struct Rectangle box;       /* the overlay's box, on the screen (may reach past it) */
+    UWORD pic_width, pic_height;    /* OVA_PicWidth and OVA_PicHeight */
+    UWORD nrects, pad2;
+    struct Rectangle rects[OVP_MAXRECTS];   /* what of the box shows, in no order */
 };
 
 #define LVO_OpenOverlay         (-264)
-#define LVO_OverlayInfo         (-270)
-#define LVO_DamageOverlay       (-276)
-#define LVO_SetOverlayAttrs     (-282)
-#define LVO_CloseOverlay        (-288)
+#define LVO_OverlayPlace        (-270)
+#define LVO_SetOverlayAttrs     (-276)
+#define LVO_CloseOverlay        (-282)
 
 #endif

@@ -133,6 +133,7 @@ static int oc_finish(struct change *ch, struct Layer *made, struct Layer *gone);
 static void oc_touch(struct ol_base *olb, struct Layer *l, const struct lc_rect *r);
 static void oc_demoted(struct change *ch, int ok);
 static void oc_gone(struct ol_base *olb, struct Layer *l);
+static void oc_places(struct ol_base *olb, struct Layer_Info *li);
 static void oc_info_drop(struct ol_base *olb, struct OInfo *i);
 static void oc_lock(struct ol_base *olb, int on);
 struct OCB;
@@ -1026,6 +1027,7 @@ static int finish(struct change *ch, struct Layer *made, struct Layer *gone)
     free_stack(st, ord, n);
 #ifdef OL_COMPOSITE
     if (ch->demoted) oc_demoted(ch, 1);
+    oc_places(olb, ch->li);     /* 47.111: the overlays' new places (classic layers) */
 #endif
     end(ch);
     return 0;
