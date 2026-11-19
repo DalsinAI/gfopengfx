@@ -112,26 +112,32 @@
 #define OVA_Height      (OVA_Dummy + 4)
 #define OVA_PicWidth    (OVA_Dummy + 5)     /* the picture's size, for the writer (0: not said) */
 #define OVA_PicHeight   (OVA_Dummy + 6)
+#define OVA_Aspect      (OVA_Dummy + 7)     /* 47.112: how the picture fills the box, OVASPECT_ (default KEEP) */
+
+#define OVASPECT_KEEP     0     /* its shape kept inside the box, bars around it */
+#define OVASPECT_FILL     1     /* stretched to the box */
+#define OVASPECT_INTEGER  2     /* whole multiples of its size only, centred */
 
 #define OVP_MAGIC       0x4F56504CUL        /* 'OVPL' */
-#define OVP_VERSION     1
+#define OVP_VERSION     2     /* 47.112: OVPF_WHOLE, aspect, rects on any screen; 1 was 47.111 */
 #define OVP_MAXRECTS    32
 
 #define OVPF_SHOWN      1UL     /* something of the box shows: write into rects */
 #define OVPF_COMPOSITED 2UL     /* the screen is composited (a hole is left in the layer for the box) */
 #define OVPF_TOOMANY    4UL     /* more pieces show than rects holds: the first OVP_MAXRECTS are there */
+#define OVPF_WHOLE      8UL     /* 47.112: the box shows whole, nothing in front, inside the screen: one rect, the box (a display can put it on a hardware plane) */
 
 /* The place record (big-endian, in public memory, at the same address while the overlay is open). Read it as
  * a seqlock: seq even, then the record, then seq again the same; else read it again. All on the screen. */
 struct LayerOverlayPlace {
     ULONG magic;                /* OVP_MAGIC */
-    UWORD version, pad;         /* OVP_VERSION */
+    UWORD version, aspect;      /* OVP_VERSION; OVASPECT_ (version 2; 0 in version 1) */
     volatile ULONG seq;         /* odd while it is being written */
     ULONG flags;                /* OVPF_ */
     APTR screen;                /* the screen's pixel 0,0 */
     ULONG bytes_per_row;
     UWORD screen_width, screen_height;
-    ULONG format;               /* GFOpenRTG's: 1 RGB565, 2 ARGB32; 0: the host can't write this screen (AGA) */
+    ULONG format;               /* GFOpenRTG's: 1 RGB565, 2 ARGB32; 0: the host can't write this screen (AGA): it may still show the box on a plane (version 2) */
     struct Rectangle box;       /* the overlay's box, on the screen (may reach past it) */
     UWORD pic_width, pic_height;    /* OVA_PicWidth and OVA_PicHeight */
     UWORD nrects, pad2;

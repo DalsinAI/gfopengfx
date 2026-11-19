@@ -1,0 +1,8 @@
+##base _GFOpenOverlayBase
+##bias 30
+##public
+OpenOverlay(window,tags)(a0,a1)
+OverlayPlace(overlay)(a0)
+SetOverlayAttrs(overlay,tags)(a0,a1)
+CloseOverlay(overlay)(a0)
+##end
